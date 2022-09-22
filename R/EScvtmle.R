@@ -1,5 +1,42 @@
+#' @title EScvtmle
+#'
+#' @description Runs Experiment-Selector CV-TMLE for selecting and analyzing optimal experiment as RCT with or without RWD
+#'
+#' @param txinrwd Whether active treatment is available in RWD (TRUE/FALSE)
+#' @param data The dataset
+#' @param study Character name of variable indicating study participation (e.g. "S"). This variable should take values of 1 for the RCT and can take other values for the other study. Note that the code is currently set up only to handle two studies, but may be expanded to handle multiple studies in the future.
+#' @param covariates Vector of character names of covariates to be adjusted for (e.g. c("W1", "W2"))
+#' @param treatment_var Character name of treatment variable (e.g. "A")
+#' @param treatment Name of treatment of interest (e.g. "DrugName" or 1)
+#' @param outcome Character name of outcome variable (e.g. "Y"). If Y is a binary variable subject to censoring, it should be coded as 0 for observations that were censored.
+#' @param NCO Character name of negative control outcome variable (e.g. "nco") or NULL if no NCO available. If NCO is a binary variable subject to censoring, it should be coded as 0 for observations that were censored.
+#' @param Delta Character name of a variable that is 0 if an observation was censored (missing binary outcome) and 1 otherwise. Missing outcomes may also be coded as NA, in which case a Delta variable will be added internally. If no missing outcomes, set Delta=NULL.
+#' @param Delta_NCO Character name of a variable that is 0 if the value of NCO is missing and 1 otherwise. Missing NCOs may also be coded as NA, in which case a Delta_NCO variable will be added internally. If no missing NCO or no NCO, set Delta_NCO=NULL.
+#' @param pRCT The probability of randomization to treatment in the RCT
+#' @param V Number of cross-validation folds (default 10).
+#' @param Q.SL.library Candidate algorithms for SuperLearner estimation of outcome regressions
+#' @param d.SL.library Candidate algorithms for SuperLearner estimation of missingness mechanism
+#' @param g.SL.library Candidate algorithms for SuperLearner estimation of treatment mechanism for combined RCT/RWD analysis
+#' @param Q.discreteSL Should a discrete SuperLearner be used for estimation of outcome regressions? (TRUE/FALSE)
+#' @param d.discreteSL Should a discrete SuperLearner be used for estimation of missingness mechanism? (TRUE/FALSE)
+#' @param g.discreteSL Should a discrete SuperLearner be used for estimation of treatment mechanism? (TRUE/FALSE)
+#' @param family Either "binomial" for binary outcomes or "gaussian" for continuous outcomes
+#' @param family_nco Family for negative control outcome
+#' @param fluctuation: 'logistic' (default for binary and continuos outcomes), or 'linear' describing fluctuation for TMLE updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.
+#' @param comparisons A vector of the values of study variable S that you would like to consider. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD.
+#' @param adjustnco Should we adjust for the NCO as a proxy of bias in the estimation of the ATE of A on Y? (TRUE/FALSE)
+#' @param target.gwt: As in tmle package, when TRUE, move g from denominator of clever covariate to the weight when fitting coefficient for TMLE updating.
+#'
+#' @return Returns the ATE estimate with 95\% confidence intervals for the Experiment-Selector CV-TMLE and the proportion of folds in which RWD was included in the estimate.
+#' @examples
+#' data(RCT)
+#' data(RWD)
+#' data <- rbind(RCT,RWD)
+#' results <- EScvtmle(txinrwd=1, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
+#' results
+#'@export
 
-EScvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(0,1)), adjustnco = TRUE, target.gwt = TRUE){
+EScvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE){
 
   data <- preprocess(data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, adjustnco)
 

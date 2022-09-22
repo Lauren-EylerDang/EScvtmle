@@ -1,17 +1,14 @@
-#load packages
-library(tmle)
-library(SuperLearner)
-library(origami)
-library(dplyr)
-library(MASS)
-library(stringr)
-
+#' @description Common support functions
+#' @export
+#'
 #bound clever covariates
 .bound <- function(x,n){
   x <- pmax((5/(n)^(1/2)/log(n)), pmin(1,x))
   return(x)
 }
 
+#' @export
+#'
 #apply selector_func to different datasets
 apply_selector_func <- function(txrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons){
   out <- list()
@@ -30,6 +27,8 @@ apply_selector_func <- function(txrwd, train, data, Q.SL.library, d.SL.library, 
   return(out)
 }
 
+#' @export
+#'
 validpreds <- function(data, folds, V, selector, pRCT, Delta=NULL, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons){
   out <- list()
   for(s in 1:length(comparisons)){
@@ -79,6 +78,8 @@ validpreds <- function(data, folds, V, selector, pRCT, Delta=NULL, Q.discreteSL,
   return(out)
 }
 
+#' @export
+#'
 #function for limit dist var ests
 limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons){
   out <- list()
@@ -168,6 +169,8 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
   return(out)
 }
 
+#' @export
+#'
 preprocess <- function(data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco = TRUE){
 
   #remove observations missing treatment

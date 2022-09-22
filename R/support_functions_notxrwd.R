@@ -1,3 +1,6 @@
+#' @description Support functions if active treatment not available in RWD
+#' @export
+#'
 #Function for selecting among RCT only +/- multiple potential Real World Datasets Based on the Bias-Variance Tradeoff
 selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL){
 
@@ -528,6 +531,8 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
 }
 
+#' @export
+#'
 #estimate bias-variance tradeoff using experiment-selection set for each fold
 bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation, family){
   out <- list()
