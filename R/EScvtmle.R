@@ -1,0 +1,217 @@
+
+EScvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(0,1)), adjustnco = TRUE, target.gwt = TRUE){
+
+  data <- preprocess(data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, adjustnco)
+
+  #Create cross-validation folds that preserve proportion of RCT (if txinwrd=TRUE) or of RCT controls (if txinrwd=FALSE) in validation sets
+  ids <- data$S
+
+  if(txinrwd==TRUE){
+    ids[which(data$S==1)] <- 0
+  } else {
+    ids[which(data$S==1 & data$A==0)] <- 0
+  }
+
+  folds <- make_folds(data, fold_fun = folds_vfold, V=V, strata_ids = ids)
+  data$v <- rep(NA, nrow(data))
+  for(v in 1:V){
+    data$v[folds[[v]]$validation_set]<-v
+  }
+
+  results <- list()
+  selector <- list()
+  valid_initial <- list()
+
+  lambdatilde <- list()
+  lambdatilde$b2v <- list()
+  lambdatilde$ncobias <- list()
+
+  proportionselected <- list()
+  proportionselected$b2v <- list()
+  proportionselected$ncobias <- list()
+
+  EICay <- vector()
+  EICpsipound <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
+  EICnco <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
+
+  bias <- list()
+  bias_nco <- list()
+
+  bvt <- list()
+  for(v in 1:length(folds)){
+    message(paste("Working on fold", v, "at", Sys.time(), sep=" "))
+
+    lambdatilde$b2v[[v]] <- vector()
+    proportionselected$b2v[[v]] <- vector()
+    if(is.null(NCO)==FALSE){
+      lambdatilde$ncobias[[v]] <- vector()
+      proportionselected$ncobias[[v]] <- vector()
+    }
+
+    #define training set
+    train <- data[sort(folds[[v]]$training_set),]
+
+    selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons)
+
+    if(txinrwd==TRUE){
+      bvt[[v]] <- bvt_txinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
+    } else {
+      bvt[[v]] <- bvt_notxinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
+    }
+
+    lambdatilde$b2v[[v]] <- comparisons[[which(bvt[[v]]$b2v==min(bvt[[v]]$b2v))]]
+    proportionselected$b2v[[v]] <- which(bvt[[v]]$b2v==min(bvt[[v]]$b2v))
+
+    if(is.null(NCO)==FALSE){
+      lambdatilde$ncobias[[v]] <- comparisons[[which(bvt[[v]]$addncobias==min(bvt[[v]]$addncobias))]]
+      proportionselected$ncobias[[v]] <- which(bvt[[v]]$addncobias==min(bvt[[v]]$addncobias))
+    }
+
+    for(s in 1:length(comparisons)){
+      EICpsipound[,(length(comparisons)*(v-1)+s)] <- bvt[[v]]$EICpsipound[,s]
+      EICnco[,(length(comparisons)*(v-1)+s)] <- bvt[[v]]$EICnco[,s]
+      EICay[(length(comparisons)*(v-1)+s)] <- bvt[[v]]$var[s]
+    }
+
+
+  }
+
+  valid_initial <- validpreds(data, folds, V, selector, pRCT, Delta, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons)
+
+  results$ATE <- list()
+  results$ATE$b2v <- vector()
+  results$ATE$ncobias <- vector()
+
+  limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons)
+
+  pool <- vector()
+  for(v in 1:V){
+    pool[v]<- limitdist$psi[[v]][proportionselected$b2v[[v]]]
+  }
+  results$ATE$b2v <- mean(pool)
+
+  if(is.null(NCO)==FALSE){
+    pool <- vector()
+    for(v in 1:V){
+      pool[v]<- limitdist$psi[[v]][proportionselected$ncobias[[v]]]
+    }
+    results$ATE$ncobias <- mean(pool)
+  }
+
+  #Estimated covariance matrices
+  psipoundvec <- NA
+  for(v in 1:V){
+    psipoundvec <- c(psipoundvec,bvt[[v]]$bias)
+  }
+  psipoundvec <- psipoundvec[-1]
+
+  if(is.null(NCO)==FALSE){
+    psipoundplusphivec <- NA
+    for(v in 1:V){
+      psipoundplusphivec <- c(psipoundplusphivec,(bvt[[v]]$bias + bvt[[v]]$bias_nco))
+    }
+    psipoundplusphivec <- psipoundplusphivec[-1]
+
+    #overall covariance matrix for ztilde_poundplusphi
+    EICpoundplusphi <- EICpsipound+EICnco
+    EICmat_poundplusphi <- cbind(EICpoundplusphi, limitdist$EICay)
+    covMat_poundplusphi <- (t(EICmat_poundplusphi)%*%EICmat_poundplusphi)/nrow(data)
+
+    ztilde_poundplusphi_samp <- mvrnorm(n = 1000, mu=rep(0,ncol(EICmat_poundplusphi)), Sigma=covMat_poundplusphi/nrow(data))
+  }
+
+  #overall covariance matrix for ztilde
+  EICmat <- cbind(EICpsipound, limitdist$EICay)
+
+  covMat <- (t(EICmat)%*%EICmat)/nrow(data)
+
+  #sample from multivariate ztildes
+  ztilde_samp <- mvrnorm(n = 1000, mu=rep(0,ncol(EICmat)), Sigma=covMat/nrow(data))
+
+  #selector for each sample
+  biassample_psipound <- ztilde_samp[,(1:as.numeric(length(comparisons)*V))]
+  if(is.null(NCO)==FALSE){
+    biassample_psipoundplusphi <- ztilde_poundplusphi_samp[,(1:as.numeric(length(comparisons)*V))]
+  }
+
+  lambdatildeb2v <- matrix(NA, nrow=1000, ncol=length(psipoundvec))
+  lambdatildencobias <- matrix(NA, nrow=1000, ncol=length(psipoundplusphivec))
+  for(b in 1:1000){
+    lambdatildeb2v[b,] <- (biassample_psipound[b,]+psipoundvec)^2 + EICay
+    if(is.null(NCO)==FALSE){
+      lambdatildencobias[b,] <- (biassample_psipoundplusphi[b,] + psipoundplusphivec)^2 + EICay
+    }
+  }
+
+  psisamp <- ztilde_samp[,(((as.numeric(length(comparisons)*V)+1)):(2*as.numeric(length(comparisons)*V)))]
+  if(is.null(NCO)==FALSE){
+    psisamp_poundplusphi <- ztilde_poundplusphi_samp[,(((as.numeric(length(comparisons)*V)+1)):(2*as.numeric(length(comparisons)*V)))]
+  }
+
+  #arrange V samples from limit distribution for psi_star for each sample
+  sample_psi_pstarnv<- list()
+  for(b in 1:1000){
+    sample_psi_pstarnv[[b]] <- matrix(0, nrow=V, ncol=length(comparisons))
+    for(v in 1:V){
+      sample_psi_pstarnv[[b]][v,] <- psisamp[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]
+    }
+  }
+
+  #now take average over whichever selected in the bias samples for each of 1000 samples
+  psi_pstarnv_b2v <- vector()
+  psi_pstarnv_b2v_v <- list()
+  psi_pstarnv_nco <- vector()
+  psi_pstarnv_nco_v <- list()
+  for(b in 1:1000){
+    psi_pstarnv_b2v_v[[b]] <- vector()
+    psi_pstarnv_nco_v[[b]] <- vector()
+    for(v in 1:V){
+      psi_pstarnv_b2v_v[[b]][v] <- sample_psi_pstarnv[[b]][v,which(lambdatildeb2v[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]==min(lambdatildeb2v[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]))]
+      if(is.null(NCO)==FALSE){
+        psi_pstarnv_nco_v[[b]][v] <- sample_psi_pstarnv[[b]][v,which(lambdatildencobias[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]==min(lambdatildencobias[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]))]
+      }
+    }
+    psi_pstarnv_b2v[b] <- mean(psi_pstarnv_b2v_v[[b]])
+    if(is.null(NCO)==FALSE){
+      psi_pstarnv_nco[b] <- mean(psi_pstarnv_nco_v[[b]])
+    }
+  }
+
+  results$ATE <- list()
+  results$Var <- list()
+
+  results$ATE$b2v <- list()
+  results$ATE$ncobias <- list()
+
+  results$Var$b2v <- list()
+  results$Var$ncobias <- list()
+
+  results$CI$b2v <- list()
+  results$CI$ncobias <- list()
+
+  if(any(unlist(proportionselected$b2v)!=1)){
+    results$Var$b2v <- var(psi_pstarnv_b2v)
+    results$CI$b2v <- results$ATE$b2v + quantile(psi_pstarnv_b2v, probs = c(0.025,0.975))
+  } else {
+    results$Var$b2v <- limitdist$Var
+    results$CI$b2v <- c((results$ATE$b2v - 1.96*(limitdist$Var)^(1/2)), (results$ATE$b2v + 1.96*(limitdist$Var)^(1/2)))
+  }
+
+  if(is.null(NCO)==FALSE){
+    if(any(unlist(proportionselected$ncobias)!=1)){
+      results$Var$ncobias <- var(psi_pstarnv_nco)
+      results$CI$ncobias <- results$ATE$ncobias + quantile(psi_pstarnv_nco, probs = c(0.025,0.975))
+    } else {
+      results$Var$ncobias <- limitdist$Var
+      results$CI$ncobias <- c((results$ATE$ncobias - 1.96*(limitdist$Var)^(1/2)), (results$ATE$ncobias + 1.96*(limitdist$Var)^(1/2)))
+    }
+  }
+
+  results$proportionselected_mean <- list()
+  results$proportionselected_mean$b2v <- (mean(unlist(proportionselected$b2v))-1)
+  if(is.null(NCO)==FALSE){
+    results$proportionselected_mean$ncobias <- (mean(unlist(proportionselected$ncobias))-1)
+  }
+
+  return(results)
+}
