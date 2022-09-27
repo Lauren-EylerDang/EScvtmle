@@ -1,4 +1,4 @@
-#' @title EScvtmle
+#' @title ES.cvtmle
 #'
 #' @description Runs Experiment-Selector CV-TMLE for selecting and analyzing optimal experiment as RCT with or without RWD
 #'
@@ -22,21 +22,43 @@
 #' @param g.discreteSL Should a discrete SuperLearner be used for estimation of treatment mechanism? (TRUE/FALSE)
 #' @param family Either "binomial" for binary outcomes or "gaussian" for continuous outcomes
 #' @param family_nco Family for negative control outcome
-#' @param fluctuation: 'logistic' (default for binary and continuos outcomes), or 'linear' describing fluctuation for TMLE updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.
+#' @param fluctuation 'logistic' (default for binary and continuos outcomes), or 'linear' describing fluctuation for TMLE updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.
 #' @param comparisons A vector of the values of study variable S that you would like to consider. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD.
 #' @param adjustnco Should we adjust for the NCO as a proxy of bias in the estimation of the ATE of A on Y? (TRUE/FALSE)
-#' @param target.gwt: As in tmle package, when TRUE, move g from denominator of clever covariate to the weight when fitting coefficient for TMLE updating.
+#' @param target.gwt As in tmle package, when TRUE, move g from denominator of clever covariate to the weight when fitting coefficient for TMLE updating.
 #'
-#' @return Returns the ATE estimate with 95\% confidence intervals for the Experiment-Selector CV-TMLE and the proportion of folds in which RWD was included in the estimate.
+#' @importFrom origami make_folds
+#' @importFrom origami folds_vfold
+#' @importFrom MASS mvrnorm
+#' @importFrom stats var
+#' @importFrom stats quantile
+#' @importFrom SuperLearner SuperLearner
+#'
+#' @return Returns the ATE estimate with 95% confidence intervals for the Experiment-Selector CV-TMLE and the proportion of folds in which RWD was included in the estimate.
 #' @examples
-#' data(RCT)
-#' data(RWD)
-#' data <- rbind(RCT,RWD)
-#' results <- EScvtmle(txinrwd=1, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
-#' results
-#'@export
+#' data(wash)
+#' #For unbiased external controls, use:
+#' dat <- wash[which(wash$study %in% c(1,2)),]
+#' library(SuperLearner)
+#' set.seed(2022)
+#' results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
+#'                           data=dat, study="study",
+#'                           covariates=c("aged", "sex", "momedu", "hfiacat"),
+#'                           treatment_var="treatment", treatment=1,
+#'                           outcome="laz", NCO="Nlt18scale",
+#'                           Delta=NULL, Delta_NCO=NULL,
+#'                           pRCT=0.5, V=10, Q.SL.library=c("SL.glm"),
+#'                           g.SL.library=c("SL.glm"), Q.discreteSL=TRUE, g.discreteSL=TRUE,
+#'                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
+#'                           comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
+#' print(results_rwd1)
+#' @export
 
-EScvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE){
+ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE){
+
+  if (length(comparisons)>2) stop("Package currently compares two experiments. Check back for updates to compare multiple experiments.")
+
+  if (comparisons[[1]]!=1) stop("First comparison should be c(1) (ie compare to RCT only).")
 
   data <- preprocess(data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, adjustnco)
 
@@ -172,7 +194,9 @@ EScvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment,
   }
 
   lambdatildeb2v <- matrix(NA, nrow=1000, ncol=length(psipoundvec))
-  lambdatildencobias <- matrix(NA, nrow=1000, ncol=length(psipoundplusphivec))
+  if(is.null(NCO)==FALSE){
+    lambdatildencobias <- matrix(NA, nrow=1000, ncol=length(psipoundplusphivec))
+  }
   for(b in 1:1000){
     lambdatildeb2v[b,] <- (biassample_psipound[b,]+psipoundvec)^2 + EICay
     if(is.null(NCO)==FALSE){
@@ -214,14 +238,6 @@ EScvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment,
     }
   }
 
-  results$ATE <- list()
-  results$Var <- list()
-
-  results$ATE$b2v <- list()
-  results$ATE$ncobias <- list()
-
-  results$Var$b2v <- list()
-  results$Var$ncobias <- list()
 
   results$CI$b2v <- list()
   results$CI$ncobias <- list()
@@ -249,6 +265,29 @@ EScvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment,
   if(is.null(NCO)==FALSE){
     results$proportionselected_mean$ncobias <- (mean(unlist(proportionselected$ncobias))-1)
   }
+  results$NCO <- NCO
+
+  class(results) <- "EScvtmle"
 
   return(results)
+}
+
+print.EScvtmle <- function(x,...) {
+  if(identical(class(x), "EScvtmle")){
+      if(is.null(x$NCO)==FALSE){
+        cat("Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
+        cat("\n   Without NCO: ", paste(round(x$ATE$b2v, 3), " 95% CI (", round(x$CI$b2v[1],3), " - ", round(x$CI$b2v[2],3), ")", sep=""))
+        cat("\n   RWD included in ", paste((x$proportionselected_mean$b2v*100), "% of folds.", sep=""),"\n")
+
+        cat("\n Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
+        cat("\n   With NCO: ", paste(round(x$ATE$ncobias, 3), " 95% CI (", round(x$CI$ncobias[1],3), " - ", round(x$CI$ncobias[2],3), ")", sep=""))
+        cat("\n   RWD included in ", paste((x$proportionselected_mean$ncobias*100), "% of folds.", sep=""),"\n")
+      } else {
+        cat("Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
+        cat("\n   Without NCO: ", paste(round(x$ATE$b2v, 3), " 95% CI (", round(x$CI$b2v[1],3), " - ", round(x$CI$b2v[2],3), ")", sep=""))
+        cat("\n   RWD included in ", paste((x$proportionselected_mean$b2v*100), "% of folds.", sep=""),"\n")
+      }
+  } else {
+    stop("Error: Object class is not EScvtmle \n")
+  }
 }

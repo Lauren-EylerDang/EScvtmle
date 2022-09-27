@@ -1,7 +1,6 @@
-#' @description Support functions if active treatment not available in RWD
-#' @export
-#'
-#Function for selecting among RCT only +/- multiple potential Real World Datasets Based on the Bias-Variance Tradeoff
+#' @importFrom SuperLearner SuperLearner
+#' @importFrom stats predict
+#Function for training Super Learner estimators for outcome regressions and treatment mechanisms and calculating clever covariates for TMLE estimation of bias terms
 selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL){
 
   #Estimate bias
@@ -27,7 +26,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     if(is.null(Delta)==FALSE){
       Ynomiss <- Y[which(X$Delta==1)]
       Xnomiss <- X[which(X$Delta==1),]
-      Xnomiss <- subset(Xnomiss, select=-c(Delta))
+      Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("Delta"))]
     } else {
       Ynomiss <- Y
       Xnomiss <- X
@@ -64,7 +63,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- SuperLearner(Y=X$Delta, X=subset(X, select=-c(Delta)), SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -80,7 +79,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     }
 
     # Estimate the exposure mechanism g(A|W)
-    gHatSL<- SuperLearner(Y=X$A, X=subset(X, select= -c(A,Delta)), SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+    gHatSL<- SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
     if(g.discreteSL==TRUE){
       keepAlg <- which.min(gHatSL$cvRisk)
       gHatSL <- gHatSL$fitLibrary[[keepAlg]]
@@ -132,7 +131,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
     if(is.null(Delta)==FALSE){
       XSnomiss <- XS[which(XS$Delta==1),]
-      XSnomiss <- subset(XSnomiss, select=-c(Delta))
+      XSnomiss <- XSnomiss[ , -which(colnames(XSnomiss) %in% c("Delta"))]
     } else {
       XSnomiss <- XS
       XS$Delta <- rep(1, nrow(XS))
@@ -169,7 +168,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     #------------------------------------------
     lambda_A0 <- XS[which(XS$A==0 & XS$Delta==1),]
     # call Super Learner for the exposure mechanism
-    gSHatSL<- SuperLearner(Y=lambda_A0$S, X=subset(lambda_A0, select= -c(A,S,Delta)), SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+    gSHatSL<- SuperLearner(Y=lambda_A0$S, X=lambda_A0[ , -which(colnames(lambda_A0) %in% c("A","S","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
     if(g.discreteSL==TRUE){
       keepAlg <- which.min(gSHatSL$cvRisk)
       gSHatSL <- gSHatSL$fitLibrary[[keepAlg]]
@@ -213,7 +212,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       if(is.null(Delta_NCO)==FALSE){
         NCOnomiss <- train_s_nco[which(X$NCO_delta==1)]
         Xnomiss <- X[which(X$NCO_delta==1),]
-        Xnomiss <- subset(Xnomiss, select=-c(NCO_delta))
+        Xnomiss <- Xnomiss[ , -which(names(Xnomiss) %in% c("NCO_delta"))]
       } else {
         NCOnomiss <- train_s_nco
         Xnomiss <- X
@@ -245,7 +244,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       }
 
       # Estimate the exposure mechanism g(A|W)
-      gHatSLnco<- SuperLearner(Y=X$A, X=subset(X, select= -c(A,NCO_delta)), SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      gHatSLnco<- SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","NCO_delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
       if(g.discreteSL==TRUE){
         keepAlg <- which.min(gHatSLnco$cvRisk)
         gHatSLnco <- gHatSLnco$fitLibrary[[keepAlg]]
@@ -259,7 +258,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=subset(X, select=-c(NCO_delta)), SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]
@@ -331,7 +330,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     if(is.null(Delta)==FALSE){
       Ynomiss <- Y[which(X$Delta==1)]
       Xnomiss <- X[which(X$Delta==1),]
-      Xnomiss <- subset(Xnomiss, select=-c(Delta))
+      Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("Delta"))]
     } else {
       Ynomiss <- Y
       Xnomiss <- X
@@ -368,7 +367,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- SuperLearner(Y=X$Delta, X=subset(X, select=-c(Delta)), SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -435,7 +434,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       if(is.null(Delta_NCO)==FALSE){
         NCOnomiss <- train_s_nco[which(X$NCO_delta==1)]
         Xnomiss <- X[which(X$NCO_delta==1),]
-        Xnomiss <- subset(Xnomiss, select=-c(NCO_delta))
+        Xnomiss <- Xnomiss[ , -which(names(Xnomiss) %in% c("NCO_delta"))]
       } else {
         NCOnomiss <- train_s_nco
         Xnomiss <- X
@@ -465,16 +464,13 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
         NCObar0W <- predict(NCObarSL, X0)$pred
       }
 
-
-
-
       gHat1W<- rep(pRCT, nrow(X))
       # predicted prob of not being exposed, given baseline covariates
       gHat0W<- 1- gHat1W
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=subset(X, select=-c(NCO_delta)), SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]
@@ -531,8 +527,10 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
 }
 
-#' @export
-#'
+
+#' @importFrom stats glm
+#' @importFrom stats plogis
+#' @importFrom stats qlogis
 #estimate bias-variance tradeoff using experiment-selection set for each fold
 bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation, family){
   out <- list()
@@ -623,7 +621,7 @@ bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuatio
     }
 
     out$bias[s] <- mean(QbarS0W.star) - mean(Qbar0W.star)
-    out$var[s] <- var(EIClambdav)/length(trainsY)
+    out$var[s] <- var(out$EIClambdav)/length(trainsY)
 
     #nco
     if(is.null(NCO)==FALSE){

@@ -1,6 +1,5 @@
-#' @description Support functions if active treatment available in RWD
-#' @export
-#'
+#' @importFrom SuperLearner SuperLearner
+#' @importFrom stats predict
 #Function for selecting among RCT only +/- multiple potential Real World Datasets Based on the Bias-Variance Tradeoff
 selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL){
 
@@ -13,13 +12,13 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
     }
 
     if(adjustnco == FALSE){
-      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "NCO_delta", "v"))==FALSE)]
+      X <- train_s[,which((colnames(train_s) %in% c("Y", "nco", "NCO_delta", "v"))==FALSE)]
     } else {
-      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "NCO_delta", "v"))==FALSE)]
+      X <- train_s[,which((colnames(train_s) %in% c("Y", "NCO_delta", "v"))==FALSE)]
     }
 
 
-    # set the A=0 in X0
+    # set A=0 in X0 and A=1 in X1
     X0 <- X1 <- X
     X0$A <- 0
     X1$A <- 1
@@ -27,7 +26,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
     if(is.null(Delta)==FALSE){
       Ynomiss <- Y[which(X$Delta==1)]
       Xnomiss <- X[which(X$Delta==1),]
-      Xnomiss <- subset(Xnomiss, select=-c(Delta))
+      Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("Delta"))]
     } else {
       Ynomiss <- Y
       Xnomiss <- X
@@ -64,7 +63,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- SuperLearner(Y=X$Delta, X=subset(X, select=-c(Delta)), SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -80,7 +79,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
     }
 
     # Estimate the exposure mechanism g(A|W)
-    gHatSL<- SuperLearner(Y=X$A, X=subset(X, select= -c(A,Delta)), SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+    gHatSL<- SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
     if(g.discreteSL==TRUE){
       keepAlg <- which.min(gHatSL$cvRisk)
       gHatSL <- gHatSL$fitLibrary[[keepAlg]]
@@ -118,78 +117,66 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
     }
 
     #TMLE for E[E[Y|W,A=0,S=1]]
-    if(adjustnco == FALSE){
-      XS <- train_s[,which((colnames(train_s) %in% c("Y", "nco", "NCO_delta", "v"))==FALSE)]
-    } else {
-      XS <- train_s[,which((colnames(train_s) %in% c("Y", "NCO_delta", "v"))==FALSE)]
-    }
-
 
     # set S=1 and A to 0 or 1
-    XS1 <- XS0 <- XS
+    XS1 <- XS0 <- X
     XS1$S <- XS0$S <- 1
     XS1$A <- 1
     XS0$A <- 0
 
-    if(is.null(Delta)==FALSE){
-      XSnomiss <- XS[which(XS$Delta==1),]
-      XSnomiss <- subset(XSnomiss, select=-c(Delta))
-    } else {
-      XSnomiss <- XS
-      XS$Delta <- rep(1, nrow(XS))
-    }
-    # call Super Learner for estimation of QbarSAW
-    if(fluctuation == "logistic"){
-      QbarSL_S<- SuperLearner(Y=Ynomiss, X=XSnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
-
-      if(Q.discreteSL==TRUE){
-        keepAlg <- which.min(QbarSL_S$cvRisk)
-        QbarSL_S <- QbarSL_S$fitLibrary[[keepAlg]]
-      }
-    } else {
-      QbarSL_S<- SuperLearner(Y=Ynomiss, X=XSnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE))
-
-      if(Q.discreteSL==TRUE){
-        keepAlg <- which.min(QbarSL_S$cvRisk)
-        QbarSL_S <- QbarSL_S$fitLibrary[[keepAlg]]
-      }
-    }
-
     # initial estimates of the outcome, given the observed exposure & covariates
     if(Q.discreteSL==TRUE){
-      QbarSAW <- predict(QbarSL_S, newdata=XS)
+      QbarSAW <- predict(QbarSL, newdata=X)
       # estimates of the outcome, given S=1 and A=1 or A=0 and covariates
-      QbarS1W<- predict(QbarSL_S, newdata=XS1)
-      QbarS0W<- predict(QbarSL_S, newdata=XS0)
+      QbarS1W<- predict(QbarSL, newdata=XS1)
+      QbarS0W<- predict(QbarSL, newdata=XS0)
     } else {
-      QbarSAW <- predict(QbarSL_S, newdata=XS)$pred
+      QbarSAW <- predict(QbarSL, newdata=X)$pred
       # estimates of the outcome, given S=1 and A=1 or A=0 and covariates
-      QbarS1W<- predict(QbarSL_S, newdata=XS1)$pred
-      QbarS0W<- predict(QbarSL_S, newdata=XS0)$pred
+      QbarS1W<- predict(QbarSL, newdata=XS1)$pred
+      QbarS0W<- predict(QbarSL, newdata=XS0)$pred
     }
 
-    # Estimate the trial participation mechanism g(S|A=0,Delta=1,W)
+    # Estimate the trial participation mechanism g(S|A,W)
     #------------------------------------------
-    XS_D1 <- XS[which(XS$Delta==1),]
     # call Super Learner for the exposure mechanism
-    gSHatSL<- SuperLearner(Y=XS_D1$S, X=subset(XS_D1, select= -c(S,Delta)), SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+    gSHatSL<- SuperLearner(Y=X$S, X=X[ , -which(names(X) %in% c("S","A","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
     if(g.discreteSL==TRUE){
       keepAlg <- which.min(gSHatSL$cvRisk)
       gSHatSL <- gSHatSL$fitLibrary[[keepAlg]]
-      gSHat1W <- predict(gSHatSL, newdata = XS1)
-      gSHat0W <- predict(gSHatSL, newdata = XS0)
+      gSHat1W <- predict(gSHatSL, newdata = X)
     } else {
       # generate predicted prob being exposed, given baseline covariates
-      gSHat1W <- predict(gSHatSL, newdata = XS1)$pred
-      gSHat0W <- predict(gSHatSL, newdata = XS0)$pred
+      gSHat1W <- predict(gSHatSL, newdata = X)$pred
     }
 
+    #get missingness mechanism setting S=1: P(Delta=1|A,S=1,W)
+    if(is.null(Delta)==FALSE){
+      if(d.discreteSL==TRUE){
+        dHat1W$S1A1 <- predict(DbarSL, newdata = XS1)
+        dHat1W$S1A0 <- predict(DbarSL, newdata = XS0)
+      } else {
+        dHat1W$S1A1 <- predict(DbarSL, newdata = XS1)$pred
+        dHat1W$S1A0 <- predict(DbarSL, newdata = XS0)$pred
+      }
+    } else {
+      dHat1W$S1A1 <- dHat1W$S1A0 <- rep(1, nrow(X))
+    }
+
+    #P(A|S=1,W)
+    if(g.discreteSL==TRUE){
+      gHata1_S1W<- predict(gHatSL, newdata = XS1)
+    } else {
+      gHata1_S1W<- predict(gHatSL, newdata = XS1)$pred
+    }
+
+    gHata0_S1W = 1-gHata1_S1W
 
     #-------------------------------------------------
     # Clever covariate H(S,A,W) for each subject
     #-------------------------------------------------
     if(target.gwt){
-      wt_s <- as.numeric(XS$A==1 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHat1W*dHat1W$A1),nrow(train_s)) + as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat0W*gHat0W*dHat1W$A0),nrow(train_s))
+      wt_s <- as.numeric(XS$A==1 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHata1_S1W*dHat1W$S1A1),nrow(train_s)) + as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHata0_S1W*dHat1W$S1A0),nrow(train_s))
       H.SAW1 <- as.numeric(XS$A==1 & XS$S==1 & XS$Delta == 1)
       H.SAW0 <- -1*as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)
 
@@ -198,12 +185,12 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
       H.S0W<- rep(-1, nrow(XS))
     } else{
       wt_s <- rep(1, nrow(XS))
-      H.SAW1 <- as.numeric(XS$A==1 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHat1W*dHat1W$A1),nrow(train_s))
-      H.SAW0 <- -1*as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat0W*gHat0W*dHat1W$A0),nrow(train_s))
+      H.SAW1 <- as.numeric(XS$A==1 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHata1_S1W*dHat1W$S1A1),nrow(train_s))
+      H.SAW0 <- -1*as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHata0_S1W*dHat1W$S1A0),nrow(train_s))
 
       # also want to evaluate the clever covariates at S=1 and A=1 or 0 for all subjects
-      H.S1W<- 1/.bound((gSHat1W*gHat1W*dHat1W$A1),nrow(train_s))
-      H.S0W<- -1/.bound((gSHat0W*gHat0W*dHat1W$A0),nrow(train_s))
+      H.S1W<- 1/.bound((gSHat1W*gHata1_S1W*dHat1W$S1A1),nrow(train_s))
+      H.S0W<- -1/.bound((gSHat1W*gHata0_S1W*dHat1W$S1A0),nrow(train_s))
     }
 
     if(is.null(NCO)==FALSE){
@@ -214,7 +201,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
         train_s_nco <- train_s$nco
       }
 
-      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "Delta", "v"))==FALSE)]
+      X <- train_s[,which((colnames(train_s) %in% c("Y", "nco", "Delta", "v"))==FALSE)]
       X0 <- X1 <- X
       X0$A <- 0
       X1$A <- 1
@@ -222,7 +209,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
       if(is.null(Delta_NCO)==FALSE){
         NCOnomiss <- train_s_nco[which(X$NCO_delta==1)]
         Xnomiss <- X[which(X$NCO_delta==1),]
-        Xnomiss <- subset(Xnomiss, select=-c(NCO_delta))
+        Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("NCO_delta"))]
       } else {
         NCOnomiss <- train_s_nco
         Xnomiss <- X
@@ -254,7 +241,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
       }
 
       # Estimate the exposure mechanism g(A|W)
-      gHatSLnco<- SuperLearner(Y=X$A, X=subset(X, select= -c(A,NCO_delta)), SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      gHatSLnco<- SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","NCO_delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
       if(g.discreteSL==TRUE){
         keepAlg <- which.min(gHatSLnco$cvRisk)
         gHatSLnco <- gHatSLnco$fitLibrary[[keepAlg]]
@@ -268,7 +255,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=subset(X, select=-c(NCO_delta)), SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]
@@ -340,7 +327,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
     if(is.null(Delta)==FALSE){
       Ynomiss <- Y[which(X$Delta==1)]
       Xnomiss <- X[which(X$Delta==1),]
-      Xnomiss <- subset(Xnomiss, select=-c(Delta))
+      Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("Delta"))]
     } else {
       Ynomiss <- Y
       Xnomiss <- X
@@ -377,7 +364,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- SuperLearner(Y=X$Delta, X=subset(X, select=-c(Delta)), SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -447,7 +434,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
       if(is.null(Delta_NCO)==FALSE){
         NCOnomiss <- train_s_nco[which(X$NCO_delta==1)]
         Xnomiss <- X[which(X$NCO_delta==1),]
-        Xnomiss <- subset(Xnomiss, select=-c(NCO_delta))
+        Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("NCO_delta"))]
       } else {
         NCOnomiss <- train_s_nco
         Xnomiss <- X
@@ -486,7 +473,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=subset(X, select=-c(NCO_delta)), SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]
@@ -543,8 +530,9 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
 
 }
 
-#' @export
-#'
+#' @importFrom stats glm
+#' @importFrom stats plogis
+#' @importFrom stats qlogis
 #estimate bias-variance tradeoff using experiment-selection set for each fold
 bvt_txinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation, family){
   out <- list()
@@ -641,7 +629,7 @@ bvt_txinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation,
 
     out$bias[s] <- mean(Qbar1W.star - Qbar0W.star) - mean(QbarS1W.star - QbarS0W.star)
     #var[s] <- EICay[(length(comparisons)*(v-1)+s)] <- var(EIClambdav)/length(trainsY)
-    out$var[s] <- var(EIClambdav)/length(trainsY)
+    out$var[s] <- var(out$EIClambdav)/length(trainsY)
 
     #nco
     if(is.null(NCO)==FALSE){

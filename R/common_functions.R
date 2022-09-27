@@ -1,16 +1,94 @@
-#' @description Common support functions
-#' @export
 #'
-#bound clever covariates
+#bound denominator of clever covariates
 .bound <- function(x,n){
+  if(any(x==0)){
+    stop("Denominator of clever covariate 0 for at least one observation. Positivity violation?")
+  }
   x <- pmax((5/(n)^(1/2)/log(n)), pmin(1,x))
   return(x)
 }
 
-#' @export
-#'
+#' @importFrom dplyr rename
+# Function to pre-process data
+# Includes removal of observations from observational dataset with W covariates not represented in RCT if txinrwd==FALSE
+preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco = adjustnco){
+
+  #remove observations missing treatment
+  data <- rename(data, A = treatment_var)
+
+  if(length(which(is.na(data$A)))>0) message("Removing observations with missing treatment variable.")
+  data <- data[which(is.na(data$A)==FALSE),]
+
+  #make A coded as 1=treatment of interest, 0=control
+  data$A <- ifelse(data$A == treatment, 1, 0)
+
+  data <- rename(data, S = study)
+  data <- rename(data, Y = outcome)
+
+  if (length(which(data$S>1 & data$A==1))>0 & txinrwd==FALSE) stop("Active treatment available in external data. Set txinrwd==TRUE.")
+
+  #trim data to avoid positivity violation if txinrwd=FALSE
+  if(txinrwd==FALSE){
+    for(w in 1:length(covariates)){
+      if(is.factor(data[,covariates[w]])==FALSE){
+        whichW <- which(data$S!=1 & (data[,covariates[w]] < (min(data[which(data$S==1),covariates[w]]))) | (data[,covariates[w]] > (max(data[which(data$S==1),covariates[w]]))))
+      } else {
+        whichW <- which(data$S!=1 & (data[,covariates[w]] %in% (data[which(data$S==1),covariates[w]]))==FALSE)
+      }
+      if(length(whichW)>0){
+        data <- data[-whichW,]
+      }
+    }
+  }
+
+  if(is.null(NCO) == FALSE){
+    data <- rename(data, nco = NCO)
+
+    if(adjustnco == TRUE & txinrwd == FALSE){
+      whichW <- which(data$S!=1 & (data[,"nco"] < (min(data[which(data$S==1),"nco"]))) | (data[,"nco"] > (max(data[which(data$S==1),"nco"]))))
+      if(length(whichW)>0){
+        data <- data[-whichW,]
+      }
+    }
+
+    if(is.null(Delta_NCO)==FALSE){
+      data <- rename(data, NCO_delta = Delta_NCO)
+    }
+
+    if(any(is.na(data$nco)==TRUE)){
+      if(is.null(Delta_NCO)==TRUE){
+        data$NCO_delta <- rep(1, nrow(data))
+        data$NCO_delta[which(is.na(data$nco)==TRUE)] <- 0
+        Delta_NCO <- "NCO_delta"
+      }
+      data$nco[which(is.na(data$nco)==TRUE)] <- mean(data$nco, na.rm=TRUE)
+    }
+  }
+
+
+  if(is.null(Delta)==FALSE){
+    data <- rename(data, Delta = Delta)
+  }
+
+  if(any(is.na(data$Y)==TRUE)){
+    if(is.null(Delta)==TRUE){
+      data$Delta <- rep(1, nrow(data))
+      data$Delta[which(is.na(data$Y)==TRUE)] <- 0
+      Delta <- "Delta"
+    }
+    data$Y[which(is.na(data$Y)==TRUE)] <- mean(data$Y, na.rm=TRUE)
+  }
+
+
+
+  data <- data[,which(colnames(data) %in% c("S", covariates, "A", "Y", "nco", "NCO_delta", "Delta"))]
+
+  return(data)
+}
+
+
 #apply selector_func to different datasets
-apply_selector_func <- function(txrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons){
+apply_selector_func <- function(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons){
   out <- list()
   for(s in 1:(length(comparisons))){
 
@@ -18,7 +96,7 @@ apply_selector_func <- function(txrwd, train, data, Q.SL.library, d.SL.library, 
     train_s <- train[which(train$S %in% comparisons[[s]]),]
     train_s$S[which(train_s$S!=1)]<-0
 
-    if(txrwd==TRUE){
+    if(txinrwd==TRUE){
       out[[s]] <- selector_func_txrwd(train_s = train_s, data=data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family = family, family_nco = family_nco, fluctuation = fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL)
     } else {
       out[[s]] <- selector_func_notxrwd(train_s = train_s, data=data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family = family, family_nco = family_nco, fluctuation = fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL)
@@ -27,8 +105,7 @@ apply_selector_func <- function(txrwd, train, data, Q.SL.library, d.SL.library, 
   return(out)
 }
 
-#' @export
-#'
+#' @importFrom stats predict
 validpreds <- function(data, folds, V, selector, pRCT, Delta=NULL, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons){
   out <- list()
   for(s in 1:length(comparisons)){
@@ -45,24 +122,24 @@ validpreds <- function(data, folds, V, selector, pRCT, Delta=NULL, Q.discreteSL,
 
     for(v in 1:V){
       if(Q.discreteSL==TRUE){
-        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$QbarAW <- predict(selector[[v]][[s]]$QbarSL, newdata = subset(data[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y)))
-        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$Qbar1W <- predict(selector[[v]][[s]]$QbarSL, newdata = subset(D1[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y)))
-        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$Qbar0W <- predict(selector[[v]][[s]]$QbarSL, newdata = subset(D0[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y)))
+        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$QbarAW <- predict(selector[[v]][[s]]$QbarSL, newdata = data[which(data$v==v & (data$S %in% comparisons[[s]])),])
+        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$Qbar1W <- predict(selector[[v]][[s]]$QbarSL, newdata = D1[which(data$v==v & (data$S %in% comparisons[[s]])),])
+        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$Qbar0W <- predict(selector[[v]][[s]]$QbarSL, newdata = D0[which(data$v==v & (data$S %in% comparisons[[s]])),])
       } else {
-        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$QbarAW <- predict(selector[[v]][[s]]$QbarSL, newdata = subset(data[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y)))$pred
-        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$Qbar1W <- predict(selector[[v]][[s]]$QbarSL, newdata = subset(D1[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y)))$pred
-        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$Qbar0W <- predict(selector[[v]][[s]]$QbarSL, newdata = subset(D0[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y)))$pred
+        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$QbarAW <- predict(selector[[v]][[s]]$QbarSL, newdata = data[which(data$v==v & (data$S %in% comparisons[[s]])),])$pred
+        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$Qbar1W <- predict(selector[[v]][[s]]$QbarSL, newdata = D1[which(data$v==v & (data$S %in% comparisons[[s]])),])$pred
+        out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$Qbar0W <- predict(selector[[v]][[s]]$QbarSL, newdata = D0[which(data$v==v & (data$S %in% comparisons[[s]])),])$pred
       }
 
       if(is.null(Delta)==FALSE){
         if(d.discreteSL==TRUE){
-          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbarAW <- predict(selector[[v]][[s]]$DbarSL, newdata = subset(data[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y,Delta)))
-          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbar1W <- predict(selector[[v]][[s]]$DbarSL, newdata = subset(D1[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y,Delta)))
-          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbar0W <- predict(selector[[v]][[s]]$DbarSL, newdata = subset(D0[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y,Delta)))
+          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbarAW <- predict(selector[[v]][[s]]$DbarSL, newdata = data[which(data$v==v & (data$S %in% comparisons[[s]])),])
+          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbar1W <- predict(selector[[v]][[s]]$DbarSL, newdata = D1[which(data$v==v & (data$S %in% comparisons[[s]])),])
+          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbar0W <- predict(selector[[v]][[s]]$DbarSL, newdata = D0[which(data$v==v & (data$S %in% comparisons[[s]])),])
         } else {
-          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbarAW <- predict(selector[[v]][[s]]$DbarSL, newdata = subset(data[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y,Delta)))$pred
-          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbar1W <- predict(selector[[v]][[s]]$DbarSL, newdata = subset(D1[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y,Delta)))$pred
-          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbar0W <- predict(selector[[v]][[s]]$DbarSL, newdata = subset(D0[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(S,Y,Delta)))$pred
+          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbarAW <- predict(selector[[v]][[s]]$DbarSL, newdata = data[which(data$v==v & (data$S %in% comparisons[[s]])),])$pred
+          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbar1W <- predict(selector[[v]][[s]]$DbarSL, newdata = D1[which(data$v==v & (data$S %in% comparisons[[s]])),])$pred
+          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$dbar0W <- predict(selector[[v]][[s]]$DbarSL, newdata = D0[which(data$v==v & (data$S %in% comparisons[[s]])),])$pred
         }
       }
 
@@ -70,7 +147,7 @@ validpreds <- function(data, folds, V, selector, pRCT, Delta=NULL, Q.discreteSL,
         out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$gHat1W <- rep(pRCT, length(which(data$v==v & (data$S %in% comparisons[[s]]))))
       } else {
         if(length(comparisons)>1){
-          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$gHat1W <- predict(selector[[v]][[s]]$gHatSL, newdata = subset(data[which(data$v==v & (data$S %in% comparisons[[s]])),], select=-c(A,S,Y)))
+          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$gHat1W <- predict(selector[[v]][[s]]$gHatSL, newdata = data[which(data$v==v & (data$S %in% comparisons[[s]])),])
         }
       }
     }
@@ -78,8 +155,10 @@ validpreds <- function(data, folds, V, selector, pRCT, Delta=NULL, Q.discreteSL,
   return(out)
 }
 
-#' @export
-#'
+#' @importFrom stringr str_match
+#' @importFrom stats glm
+#' @importFrom stats plogis
+#' @importFrom stats qlogis
 #function for limit dist var ests
 limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons){
   out <- list()
@@ -169,69 +248,3 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
   return(out)
 }
 
-#' @export
-#'
-preprocess <- function(data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco = TRUE){
-
-  #remove observations missing treatment
-  data <- rename(data, A = treatment_var)
-  data <- data[which(is.na(data$A)==FALSE),]
-
-  #make A coded as 1=treatment of interest, 0=control
-  data$A <- ifelse(data$A == treatment, 1, 0)
-
-  data <- rename(data, S = study)
-  data <- rename(data, Y = outcome)
-
-  #trim data to avoid positivity violation
-  for(w in 1:length(covariates)){
-    whichW <- which(data$S!=1 & (data[,covariates[w]] < (min(data[which(data$S==1),covariates[w]]))) | (data[,covariates[w]] > (max(data[which(data$S==1),covariates[w]]))))
-    if(length(whichW)>0){
-      data <- data[-whichW,]
-    }
-  }
-
-  if(is.null(NCO) == FALSE){
-    data <- rename(data, nco = NCO)
-
-    if(adjustnco == TRUE){
-      whichW <- which(data$S!=1 & (data[,"nco"] < (min(data[which(data$S==1),"nco"]))) | (data[,"nco"] > (max(data[which(data$S==1),"nco"]))))
-      if(length(whichW)>0){
-        data <- data[-whichW,]
-      }
-    }
-
-    if(is.null(Delta_NCO)==FALSE){
-      data <- rename(data, NCO_delta = Delta_NCO)
-    }
-
-    if(any(is.na(data$nco)==TRUE)){
-      if(is.null(Delta_NCO)==TRUE){
-        data$NCO_delta <- rep(1, nrow(data))
-        data$NCO_delta[which(is.na(data$nco)==TRUE)] <- 0
-        Delta_NCO <- "NCO_delta"
-      }
-      data$nco[which(is.na(data$nco)==TRUE)] <- mean(data$nco, na.rm=TRUE)
-    }
-  }
-
-
-  if(is.null(Delta)==FALSE){
-    data <- rename(data, Delta = Delta)
-  }
-
-  if(any(is.na(data$Y)==TRUE)){
-    if(is.null(Delta)==TRUE){
-      data$Delta <- rep(1, nrow(data))
-      data$Delta[which(is.na(data$Y)==TRUE)] <- 0
-      Delta <- "Delta"
-    }
-    data$Y[which(is.na(data$Y)==TRUE)] <- mean(data$Y, na.rm=TRUE)
-  }
-
-
-
-  data <- data[,which(colnames(data) %in% c("S", covariates, "A", "Y", "nco", "NCO_delta", "Delta"))]
-
-  return(data)
-}
