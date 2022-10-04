@@ -102,5 +102,5 @@ results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           g.SL.library=c("SL.glm"), Q.discreteSL=TRUE, g.discreteSL=TRUE,
                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                           comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
-print(results_rwd1)
+print.EScvtmle(results_rwd1)
 }

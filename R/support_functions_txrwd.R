@@ -1,7 +1,7 @@
 #' @importFrom SuperLearner SuperLearner
 #' @importFrom stats predict
 #Function for selecting among RCT only +/- multiple potential Real World Datasets Based on the Bias-Variance Tradeoff
-selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL){
+selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL){
 
   #Estimate bias
   if(any(train_s$S==0)){
@@ -34,7 +34,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
 
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="quasibinomial", control = list(saveFitLibrary=TRUE))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
@@ -176,17 +176,17 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
     # Clever covariate H(S,A,W) for each subject
     #-------------------------------------------------
     if(target.gwt){
-      wt_s <- as.numeric(XS$A==1 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHata1_S1W*dHat1W$S1A1),nrow(train_s)) + as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHata0_S1W*dHat1W$S1A0),nrow(train_s))
-      H.SAW1 <- as.numeric(XS$A==1 & XS$S==1 & XS$Delta == 1)
-      H.SAW0 <- -1*as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)
+      wt_s <- as.numeric(X$A==1 & X$S==1 & X$Delta == 1)/.bound((gSHat1W*gHata1_S1W*dHat1W$S1A1),nrow(train_s)) + as.numeric(X$A==0 & X$S==1 & X$Delta == 1)/.bound((gSHat1W*gHata0_S1W*dHat1W$S1A0),nrow(train_s))
+      H.SAW1 <- as.numeric(X$A==1 & X$S==1 & X$Delta == 1)
+      H.SAW0 <- -1*as.numeric(X$A==0 & X$S==1 & X$Delta == 1)
 
       # also want to evaluate the clever covariates at S=1 and A=1 or 0 for all subjects
-      H.S1W<- rep(1, nrow(XS))
-      H.S0W<- rep(-1, nrow(XS))
+      H.S1W<- rep(1, nrow(X))
+      H.S0W<- rep(-1, nrow(X))
     } else{
-      wt_s <- rep(1, nrow(XS))
-      H.SAW1 <- as.numeric(XS$A==1 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHata1_S1W*dHat1W$S1A1),nrow(train_s))
-      H.SAW0 <- -1*as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHata0_S1W*dHat1W$S1A0),nrow(train_s))
+      wt_s <- rep(1, nrow(X))
+      H.SAW1 <- as.numeric(X$A==1 & X$S==1 & X$Delta == 1)/.bound((gSHat1W*gHata1_S1W*dHat1W$S1A1),nrow(train_s))
+      H.SAW0 <- -1*as.numeric(X$A==0 & X$S==1 & X$Delta == 1)/.bound((gSHat1W*gHata0_S1W*dHat1W$S1A0),nrow(train_s))
 
       # also want to evaluate the clever covariates at S=1 and A=1 or 0 for all subjects
       H.S1W<- 1/.bound((gSHat1W*gHata1_S1W*dHat1W$S1A1),nrow(train_s))
@@ -217,7 +217,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
       }
 
       if(fluctuation == "logistic"){
-        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="quasibinomial", control = list(saveFitLibrary=TRUE))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
@@ -319,7 +319,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
     }
 
 
-    # set the A=0 in X0
+    # set the A=0 in X0, A=1 in X1
     X0 <- X1 <- X
     X0$A <- 0
     X1$A <- 1
@@ -335,7 +335,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
 
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="quasibinomial", control = list(saveFitLibrary=TRUE))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
@@ -441,7 +441,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
       }
 
       if(fluctuation == "logistic"){
-        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="quasibinomial", control = list(saveFitLibrary=TRUE))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
@@ -463,9 +463,6 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.
         NCObar1W <- predict(NCObarSL, X1)$pred
         NCObar0W <- predict(NCObarSL, X0)$pred
       }
-
-
-
 
       gHat1W<- rep(pRCT, nrow(X))
       # predicted prob of not being exposed, given baseline covariates
@@ -540,6 +537,7 @@ bvt_txinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation,
   out$b2v <- vector()
   out$bias <- vector()
   out$var <- vector()
+  out$EIClambdav <- list()
 
   if(is.null(NCO)==FALSE){
     out$addncobias <- vector()
@@ -558,7 +556,7 @@ bvt_txinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation,
 
     #tmle
     if(fluctuation == "logistic"){
-      logitUpdate<- glm(selector[[v]][[s]]$Y[which(train_s$Delta==1)] ~ -1 + offset(qlogis(selector[[v]][[s]]$QbarAW[which(train_s$Delta==1)])) +  selector[[v]][[s]]$H.AW1[which(train_s$Delta==1)] + selector[[v]][[s]]$H.AW0[which(train_s$Delta==1)], family='binomial', weights = selector[[v]][[s]]$wt[which(train_s$Delta==1)])
+      logitUpdate<- glm(selector[[v]][[s]]$Y[which(train_s$Delta==1)] ~ -1 + offset(qlogis(selector[[v]][[s]]$QbarAW[which(train_s$Delta==1)])) +  selector[[v]][[s]]$H.AW1[which(train_s$Delta==1)] + selector[[v]][[s]]$H.AW0[which(train_s$Delta==1)], family='quasibinomial', weights = selector[[v]][[s]]$wt[which(train_s$Delta==1)])
 
       epsilon <- logitUpdate$coef
 
@@ -585,7 +583,7 @@ bvt_txinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation,
       trainsY <- selector[[v]][[s]]$Y
     }
 
-    out$EIClambdav <- (selector[[v]][[s]]$wt*(selector[[v]][[s]]$H.AW1 + selector[[v]][[s]]$H.AW0)*(trainsY - QbarAW.star) + Qbar1W.star - Qbar0W.star - mean(Qbar1W.star - Qbar0W.star))
+    out$EIClambdav[[s]] <- (selector[[v]][[s]]$wt*(selector[[v]][[s]]$H.AW1 + selector[[v]][[s]]$H.AW0)*(trainsY - QbarAW.star) + Qbar1W.star - Qbar0W.star - mean(Qbar1W.star - Qbar0W.star))
 
     if(s==1){
       QbarS1W.star <- Qbar1W.star
@@ -595,7 +593,7 @@ bvt_txinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation,
       # Update the initial estimator
       #------------------------------------------
       if(fluctuation == "logistic"){
-        logitUpdate<- glm(selector[[v]][[s]]$Y[which(train_s$Delta==1)] ~ -1 + offset(qlogis(selector[[v]][[s]]$QbarSAW[which(train_s$Delta==1)])) +  selector[[v]][[s]]$H.SAW1[which(train_s$Delta==1)] + selector[[v]][[s]]$H.SAW0[which(train_s$Delta==1)], family='binomial', weights = selector[[v]][[s]]$wt_s[which(train_s$Delta==1)])
+        logitUpdate<- glm(selector[[v]][[s]]$Y[which(train_s$Delta==1)] ~ -1 + offset(qlogis(selector[[v]][[s]]$QbarSAW[which(train_s$Delta==1)])) +  selector[[v]][[s]]$H.SAW1[which(train_s$Delta==1)] + selector[[v]][[s]]$H.SAW0[which(train_s$Delta==1)], family='quasibinomial', weights = selector[[v]][[s]]$wt_s[which(train_s$Delta==1)])
 
         epsilon <- logitUpdate$coef
 
@@ -623,13 +621,11 @@ bvt_txinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation,
     }
 
     if(s>1){
-      #EICpsipound[which(data$v!=v & data$S %in% comparisons[[s]]),(length(comparisons)*(v-1)+s)] <- (selector[[v]][[s]]$wt*(selector[[v]][[s]]$H.AW1 + selector[[v]][[s]]$H.AW0)*(trainsY - QbarAW.star) + Qbar1W.star - Qbar0W.star - mean(Qbar1W.star - Qbar0W.star) - (selector[[v]][[s]]$wt_s*(selector[[v]][[s]]$H.SAW1 + selector[[v]][[s]]$H.SAW0)*(trainsY - QbarSAW.star) + QbarS1W.star - QbarS0W.star - mean(QbarS1W.star - QbarS0W.star)))/(length(which(train$S %in% comparisons[[s]]))/nrow(data))
       out$EICpsipound[which(data$v!=v & data$S %in% comparisons[[s]]),s] <- (selector[[v]][[s]]$wt*(selector[[v]][[s]]$H.AW1 + selector[[v]][[s]]$H.AW0)*(trainsY - QbarAW.star) + Qbar1W.star - Qbar0W.star - mean(Qbar1W.star - Qbar0W.star) - (selector[[v]][[s]]$wt_s*(selector[[v]][[s]]$H.SAW1 + selector[[v]][[s]]$H.SAW0)*(trainsY - QbarSAW.star) + QbarS1W.star - QbarS0W.star - mean(QbarS1W.star - QbarS0W.star)))/(length(which(train$S %in% comparisons[[s]]))/nrow(data))
     }
 
     out$bias[s] <- mean(Qbar1W.star - Qbar0W.star) - mean(QbarS1W.star - QbarS0W.star)
-    #var[s] <- EICay[(length(comparisons)*(v-1)+s)] <- var(EIClambdav)/length(trainsY)
-    out$var[s] <- var(out$EIClambdav)/length(trainsY)
+    out$var[s] <- var(out$EIClambdav[[s]])/length(trainsY)
 
     #nco
     if(is.null(NCO)==FALSE){
@@ -639,7 +635,7 @@ bvt_txinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation,
       }
 
       if(fluctuation == "logistic"){
-        logitUpdate<- glm(selector[[v]][[s]]$train_s_nco[which(train_s$NCO_delta==1)] ~ -1 + offset(qlogis(selector[[v]][[s]]$NCObarAW[which(train_s$NCO_delta==1)])) +  selector[[v]][[s]]$H.AWnco[which(train_s$NCO_delta==1)], family='binomial', weights = selector[[v]][[s]]$wt_nco[which(train_s$NCO_delta==1)])
+        logitUpdate<- glm(selector[[v]][[s]]$train_s_nco[which(train_s$NCO_delta==1)] ~ -1 + offset(qlogis(selector[[v]][[s]]$NCObarAW[which(train_s$NCO_delta==1)])) +  selector[[v]][[s]]$H.AWnco[which(train_s$NCO_delta==1)], family='quasibinomial', weights = selector[[v]][[s]]$wt_nco[which(train_s$NCO_delta==1)])
 
         epsilon <- logitUpdate$coef
 
@@ -666,7 +662,6 @@ bvt_txinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation,
         train_s_nco <- selector[[v]][[s]]$train_s_nco
       }
 
-      #EICnco[which(data$v!=v & data$S %in% comparisons[[s]]),(length(comparisons)*(v-1)+s)] <- (selector[[v]][[s]]$wt_nco*selector[[v]][[s]]$H.AWnco*(train_s_nco - NCObarAW.star) + NCObar1W.star - NCObar0W.star - mean(NCObar1W.star - NCObar0W.star))/(length(which(train$S %in% comparisons[[s]]))/nrow(data))
       out$EICnco[which(data$v!=v & data$S %in% comparisons[[s]]),s] <- (selector[[v]][[s]]$wt_nco*selector[[v]][[s]]$H.AWnco*(train_s_nco - NCObarAW.star) + NCObar1W.star - NCObar0W.star - mean(NCObar1W.star - NCObar0W.star))/(length(which(train$S %in% comparisons[[s]]))/nrow(data))
 
       out$bias_nco[s] <- mean(NCObar1W.star - NCObar0W.star)

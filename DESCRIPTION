@@ -4,7 +4,7 @@ Title: Experiment-Selector CV-TMLE for Integration of Observational and RCT Data
 Version: 0.1.0
 Author: Lauren Eyler Dang
 Maintainer: Lauren Eyler Dang <lauren.e.eyler@gmail.com>
-Description: The Experiment-Selector CV-TMLE selects the optimal experiment as RCT only or RCT with RWD to optimize the estimated bias-variance tradeoff for estimating the average treatment effect. For more details, please see [arXiv].
+Description: The Experiment-Selector CV-TMLE selects the optimal experiment as randomized controlled trial only or randomized controlled trial with real-world data to optimize the estimated bias-variance tradeoff for estimating the average treatment effect. For more details, please see...
 License: GPL-3
 URL: https://github.com/Lauren-EylerDang/EScvtmle/tree/master
 BugReports: https://github.com/Lauren-EylerDang/EScvtmle/issues
@@ -14,11 +14,11 @@ Imports:
     origami (>= 1.0.5),
     dplyr (>= 1.0.8),
     MASS (>= 7.3.54),
-    stringr (>= 1.4.0)
+    stringr (>= 1.4.0),
+    ggplot2 (>= 3.3.6),
+    gridExtra (>= 2.3) 
 Suggests: 
     testthat (>= 3.0.0),
-    knitr
-VignetteBuilder:
     knitr
 Encoding: UTF-8
 LazyData: true

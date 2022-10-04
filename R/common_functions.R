@@ -1,9 +1,6 @@
 #'
 #bound denominator of clever covariates
 .bound <- function(x,n){
-  if(any(x==0)){
-    stop("Denominator of clever covariate 0 for at least one observation. Positivity violation?")
-  }
   x <- pmax((5/(n)^(1/2)/log(n)), pmin(1,x))
   return(x)
 }
@@ -97,16 +94,16 @@ apply_selector_func <- function(txinrwd, train, data, Q.SL.library, d.SL.library
     train_s$S[which(train_s$S!=1)]<-0
 
     if(txinrwd==TRUE){
-      out[[s]] <- selector_func_txrwd(train_s = train_s, data=data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family = family, family_nco = family_nco, fluctuation = fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL)
+      out[[s]] <- selector_func_txrwd(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL)
     } else {
-      out[[s]] <- selector_func_notxrwd(train_s = train_s, data=data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family = family, family_nco = family_nco, fluctuation = fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL)
+      out[[s]] <- selector_func_notxrwd(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL)
     }
   }
   return(out)
 }
 
 #' @importFrom stats predict
-validpreds <- function(data, folds, V, selector, pRCT, Delta=NULL, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons){
+validpreds <- function(data, folds, V, selector, pRCT, Delta, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons){
   out <- list()
   for(s in 1:length(comparisons)){
     out[[s]] <- matrix(0, nrow=nrow(data), ncol=8)
@@ -169,8 +166,6 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
     out$psi[[v]] <- vector()
   }
 
-  out$psi_s <- vector()
-
   for(s in 1:length(comparisons)){
 
     #select experiment subset
@@ -182,7 +177,7 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
       validmat$Yscale <- (validmat$Yscale - min(data$Y))/(max(data$Y) - min(data$Y))
     }
 
-    if(all(is.na(str_match(colnames(data), "Delta"))==TRUE)){
+    if(("Delta" %in% colnames(data))==FALSE){
       data$Delta <- rep(1, nrow(data))
     }
 
@@ -202,7 +197,7 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
 
 
     if(fluctuation == "logistic"){
-      logitUpdate<- glm(validmat$Yscale[which(data$Delta==1 & (data$S %in% comparisons[[s]]))] ~ -1 + offset(qlogis(validmat$QbarAW[which(data$Delta==1 & (data$S %in% comparisons[[s]]))])) +  H.AW[which(data$Delta==1 & (data$S %in% comparisons[[s]]))], family='binomial', weights = wt[which(data$Delta==1 & (data$S %in% comparisons[[s]]))])
+      logitUpdate<- glm(validmat$Yscale[which(data$Delta==1 & (data$S %in% comparisons[[s]]))] ~ -1 + offset(qlogis(validmat$QbarAW[which(data$Delta==1 & (data$S %in% comparisons[[s]]))])) +  H.AW[which(data$Delta==1 & (data$S %in% comparisons[[s]]))], family='quasibinomial', weights = wt[which(data$Delta==1 & (data$S %in% comparisons[[s]]))])
 
       epsilon <- logitUpdate$coef
 
@@ -241,10 +236,95 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
       }
       out$Var <- mean(unlist(pooledVar))
     }
-    out$psi_s[s] <- mean((validmat$Qbar1W.star - validmat$Qbar0W.star)[which(data$S %in% comparisons[[s]])])
 
   }
 
+  return(out)
+}
+
+#function for sampling from limit distribution
+
+limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons){
+  out <- list()
+  psipoundvec <- NA
+  for(v in 1:V){
+    psipoundvec <- c(psipoundvec,bvt[[v]]$bias)
+  }
+  psipoundvec <- psipoundvec[-1]
+
+  if(is.null(NCO)==FALSE){
+    psipoundplusphivec <- NA
+    for(v in 1:V){
+      psipoundplusphivec <- c(psipoundplusphivec,(bvt[[v]]$bias + bvt[[v]]$bias_nco))
+    }
+    psipoundplusphivec <- psipoundplusphivec[-1]
+
+    #overall covariance matrix for ztilde_poundplusphi
+    EICpoundplusphi <- EICpsipound+EICnco
+    EICmat_poundplusphi <- cbind(EICpoundplusphi, limitdist$EICay)
+    out$covMat_poundplusphi <- (t(EICmat_poundplusphi)%*%EICmat_poundplusphi)/nrow(data)
+
+    ztilde_poundplusphi_samp <- mvrnorm(n = 1000, mu=rep(0,ncol(EICmat_poundplusphi)), Sigma=out$covMat_poundplusphi/nrow(data))
+  }
+
+  #overall covariance matrix for ztilde
+  EICmat <- cbind(EICpsipound, limitdist$EICay)
+
+  out$covMat <- (t(EICmat)%*%EICmat)/nrow(data)
+
+  #sample from multivariate ztildes
+  ztilde_samp <- mvrnorm(n = 1000, mu=rep(0,ncol(EICmat)), Sigma=out$covMat/nrow(data))
+
+  #selector for each sample
+  biassample_psipound <- ztilde_samp[,(1:as.numeric(length(comparisons)*V))]
+  if(is.null(NCO)==FALSE){
+    biassample_psipoundplusphi <- ztilde_poundplusphi_samp[,(1:as.numeric(length(comparisons)*V))]
+  }
+
+  lambdatildeb2v <- matrix(NA, nrow=1000, ncol=length(psipoundvec))
+  if(is.null(NCO)==FALSE){
+    lambdatildencobias <- matrix(NA, nrow=1000, ncol=length(psipoundplusphivec))
+  }
+  for(b in 1:1000){
+    lambdatildeb2v[b,] <- (biassample_psipound[b,]+psipoundvec)^2 + var_ay
+    if(is.null(NCO)==FALSE){
+      lambdatildencobias[b,] <- (biassample_psipoundplusphi[b,] + psipoundplusphivec)^2 + var_ay
+    }
+  }
+
+  psisamp <- ztilde_samp[,(((as.numeric(length(comparisons)*V)+1)):(2*as.numeric(length(comparisons)*V)))]
+  if(is.null(NCO)==FALSE){
+    psisamp_poundplusphi <- ztilde_poundplusphi_samp[,(((as.numeric(length(comparisons)*V)+1)):(2*as.numeric(length(comparisons)*V)))]
+  }
+
+  #arrange V samples from limit distribution for psi_star for each sample
+  sample_psi_pstarnv<- list()
+  for(b in 1:1000){
+    sample_psi_pstarnv[[b]] <- matrix(0, nrow=V, ncol=length(comparisons))
+    for(v in 1:V){
+      sample_psi_pstarnv[[b]][v,] <- psisamp[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]
+    }
+  }
+
+  #now take average over whichever selected in the bias samples for each of 1000 samples
+  out$psi_pstarnv_b2v <- vector()
+  psi_pstarnv_b2v_v <- list()
+  out$psi_pstarnv_nco <- vector()
+  psi_pstarnv_nco_v <- list()
+  for(b in 1:1000){
+    psi_pstarnv_b2v_v[[b]] <- vector()
+    psi_pstarnv_nco_v[[b]] <- vector()
+    for(v in 1:V){
+      psi_pstarnv_b2v_v[[b]][v] <- sample_psi_pstarnv[[b]][v,which(lambdatildeb2v[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]==min(lambdatildeb2v[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]))]
+      if(is.null(NCO)==FALSE){
+        psi_pstarnv_nco_v[[b]][v] <- sample_psi_pstarnv[[b]][v,which(lambdatildencobias[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]==min(lambdatildencobias[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]))]
+      }
+    }
+    out$psi_pstarnv_b2v[b] <- mean(psi_pstarnv_b2v_v[[b]])
+    if(is.null(NCO)==FALSE){
+      out$psi_pstarnv_nco[b] <- mean(psi_pstarnv_nco_v[[b]])
+    }
+  }
   return(out)
 }
 

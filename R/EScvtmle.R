@@ -33,6 +33,9 @@
 #' @importFrom stats var
 #' @importFrom stats quantile
 #' @importFrom SuperLearner SuperLearner
+#' @importFrom dplyr rename
+#' @importFrom ggplot2 ggplot
+#' @importFrom ggplot2 geom_point
 #'
 #' @return Returns the ATE estimate with 95% confidence intervals for the Experiment-Selector CV-TMLE and the proportion of folds in which RWD was included in the estimate.
 #' @examples
@@ -51,7 +54,7 @@
 #'                           g.SL.library=c("SL.glm"), Q.discreteSL=TRUE, g.discreteSL=TRUE,
 #'                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
 #'                           comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
-#' print(results_rwd1)
+#' print.EScvtmle(results_rwd1)
 #' @export
 
 ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE){
@@ -60,7 +63,14 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
 
   if (comparisons[[1]]!=1) stop("First comparison should be c(1) (ie compare to RCT only).")
 
-  data <- preprocess(data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, adjustnco)
+  data <- preprocess(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, adjustnco)
+  if("Delta" %in% colnames(data)){
+    Delta = "Delta"
+  }
+
+  if("NCO_delta" %in% colnames(data)){
+    Delta_NCO = "NCO_delta"
+  }
 
   #Create cross-validation folds that preserve proportion of RCT (if txinwrd=TRUE) or of RCT controls (if txinrwd=FALSE) in validation sets
   ids <- data$S
@@ -89,7 +99,7 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   proportionselected$b2v <- list()
   proportionselected$ncobias <- list()
 
-  EICay <- vector()
+  var_ay <- vector()
   EICpsipound <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
   EICnco <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
 
@@ -129,7 +139,7 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
     for(s in 1:length(comparisons)){
       EICpsipound[,(length(comparisons)*(v-1)+s)] <- bvt[[v]]$EICpsipound[,s]
       EICnco[,(length(comparisons)*(v-1)+s)] <- bvt[[v]]$EICnco[,s]
-      EICay[(length(comparisons)*(v-1)+s)] <- bvt[[v]]$var[s]
+      var_ay[(length(comparisons)*(v-1)+s)] <- bvt[[v]]$var[s]
     }
 
 
@@ -141,12 +151,18 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   results$ATE$b2v <- vector()
   results$ATE$ncobias <- vector()
 
+  results$foldATEs <- list()
+  results$foldATEs$b2v <- vector()
+  results$foldATEs$ncobias <- vector()
+
+  #estimate components of limit distribution
   limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons)
 
   pool <- vector()
   for(v in 1:V){
     pool[v]<- limitdist$psi[[v]][proportionselected$b2v[[v]]]
   }
+  results$foldATEs$b2v <- pool
   results$ATE$b2v <- mean(pool)
 
   if(is.null(NCO)==FALSE){
@@ -154,97 +170,24 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
     for(v in 1:V){
       pool[v]<- limitdist$psi[[v]][proportionselected$ncobias[[v]]]
     }
+    results$foldATEs$ncobias <- pool
     results$ATE$ncobias <- mean(pool)
   }
 
-  #Estimated covariance matrices
-  psipoundvec <- NA
-  for(v in 1:V){
-    psipoundvec <- c(psipoundvec,bvt[[v]]$bias)
-  }
-  psipoundvec <- psipoundvec[-1]
-
-  if(is.null(NCO)==FALSE){
-    psipoundplusphivec <- NA
-    for(v in 1:V){
-      psipoundplusphivec <- c(psipoundplusphivec,(bvt[[v]]$bias + bvt[[v]]$bias_nco))
-    }
-    psipoundplusphivec <- psipoundplusphivec[-1]
-
-    #overall covariance matrix for ztilde_poundplusphi
-    EICpoundplusphi <- EICpsipound+EICnco
-    EICmat_poundplusphi <- cbind(EICpoundplusphi, limitdist$EICay)
-    covMat_poundplusphi <- (t(EICmat_poundplusphi)%*%EICmat_poundplusphi)/nrow(data)
-
-    ztilde_poundplusphi_samp <- mvrnorm(n = 1000, mu=rep(0,ncol(EICmat_poundplusphi)), Sigma=covMat_poundplusphi/nrow(data))
-  }
-
-  #overall covariance matrix for ztilde
-  EICmat <- cbind(EICpsipound, limitdist$EICay)
-
-  covMat <- (t(EICmat)%*%EICmat)/nrow(data)
-
-  #sample from multivariate ztildes
-  ztilde_samp <- mvrnorm(n = 1000, mu=rep(0,ncol(EICmat)), Sigma=covMat/nrow(data))
-
-  #selector for each sample
-  biassample_psipound <- ztilde_samp[,(1:as.numeric(length(comparisons)*V))]
-  if(is.null(NCO)==FALSE){
-    biassample_psipoundplusphi <- ztilde_poundplusphi_samp[,(1:as.numeric(length(comparisons)*V))]
-  }
-
-  lambdatildeb2v <- matrix(NA, nrow=1000, ncol=length(psipoundvec))
-  if(is.null(NCO)==FALSE){
-    lambdatildencobias <- matrix(NA, nrow=1000, ncol=length(psipoundplusphivec))
-  }
-  for(b in 1:1000){
-    lambdatildeb2v[b,] <- (biassample_psipound[b,]+psipoundvec)^2 + EICay
-    if(is.null(NCO)==FALSE){
-      lambdatildencobias[b,] <- (biassample_psipoundplusphi[b,] + psipoundplusphivec)^2 + EICay
-    }
-  }
-
-  psisamp <- ztilde_samp[,(((as.numeric(length(comparisons)*V)+1)):(2*as.numeric(length(comparisons)*V)))]
-  if(is.null(NCO)==FALSE){
-    psisamp_poundplusphi <- ztilde_poundplusphi_samp[,(((as.numeric(length(comparisons)*V)+1)):(2*as.numeric(length(comparisons)*V)))]
-  }
-
-  #arrange V samples from limit distribution for psi_star for each sample
-  sample_psi_pstarnv<- list()
-  for(b in 1:1000){
-    sample_psi_pstarnv[[b]] <- matrix(0, nrow=V, ncol=length(comparisons))
-    for(v in 1:V){
-      sample_psi_pstarnv[[b]][v,] <- psisamp[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]
-    }
-  }
-
-  #now take average over whichever selected in the bias samples for each of 1000 samples
-  psi_pstarnv_b2v <- vector()
-  psi_pstarnv_b2v_v <- list()
-  psi_pstarnv_nco <- vector()
-  psi_pstarnv_nco_v <- list()
-  for(b in 1:1000){
-    psi_pstarnv_b2v_v[[b]] <- vector()
-    psi_pstarnv_nco_v[[b]] <- vector()
-    for(v in 1:V){
-      psi_pstarnv_b2v_v[[b]][v] <- sample_psi_pstarnv[[b]][v,which(lambdatildeb2v[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]==min(lambdatildeb2v[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]))]
-      if(is.null(NCO)==FALSE){
-        psi_pstarnv_nco_v[[b]][v] <- sample_psi_pstarnv[[b]][v,which(lambdatildencobias[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]==min(lambdatildencobias[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]))]
-      }
-    }
-    psi_pstarnv_b2v[b] <- mean(psi_pstarnv_b2v_v[[b]])
-    if(is.null(NCO)==FALSE){
-      psi_pstarnv_nco[b] <- mean(psi_pstarnv_nco_v[[b]])
-    }
-  }
-
+  #sample from limit distribution
+  limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons)
 
   results$CI$b2v <- list()
   results$CI$ncobias <- list()
 
+  results$limitdistributionsample <- list()
+  results$limitdistributionsample$b2v <- results$ATE$b2v + limitdistsamp$psi_pstarnv_b2v
+  results$limitdistributionsample$nco <- results$ATE$ncobias + limitdistsamp$psi_pstarnv_nco
+
+  #use quantiles of samples from limit distribution to estimate CI unless only RCT selected in all folds, then use standard CV-TMLE IC-based variance estimates
   if(any(unlist(proportionselected$b2v)!=1)){
-    results$Var$b2v <- var(psi_pstarnv_b2v)
-    results$CI$b2v <- results$ATE$b2v + quantile(psi_pstarnv_b2v, probs = c(0.025,0.975))
+    results$Var$b2v <- var(limitdistsamp$psi_pstarnv_b2v)
+    results$CI$b2v <- results$ATE$b2v + quantile(limitdistsamp$psi_pstarnv_b2v, probs = c(0.025,0.975))
   } else {
     results$Var$b2v <- limitdist$Var
     results$CI$b2v <- c((results$ATE$b2v - 1.96*(limitdist$Var)^(1/2)), (results$ATE$b2v + 1.96*(limitdist$Var)^(1/2)))
@@ -252,13 +195,17 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
 
   if(is.null(NCO)==FALSE){
     if(any(unlist(proportionselected$ncobias)!=1)){
-      results$Var$ncobias <- var(psi_pstarnv_nco)
-      results$CI$ncobias <- results$ATE$ncobias + quantile(psi_pstarnv_nco, probs = c(0.025,0.975))
+      results$Var$ncobias <- var(limitdistsamp$psi_pstarnv_nco)
+      results$CI$ncobias <- results$ATE$ncobias + quantile(limitdistsamp$psi_pstarnv_nco, probs = c(0.025,0.975))
     } else {
       results$Var$ncobias <- limitdist$Var
       results$CI$ncobias <- c((results$ATE$ncobias - 1.96*(limitdist$Var)^(1/2)), (results$ATE$ncobias + 1.96*(limitdist$Var)^(1/2)))
     }
   }
+
+  results$selected_byfold <- list()
+  results$selected_byfold$b2v <- unlist(proportionselected$b2v)
+  results$selected_byfold$ncobias <- unlist(proportionselected$ncobias)
 
   results$proportionselected_mean <- list()
   results$proportionselected_mean$b2v <- (mean(unlist(proportionselected$b2v))-1)
@@ -272,21 +219,80 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   return(results)
 }
 
-print.EScvtmle <- function(x,...) {
+#' @title print.EScvtmle
+#'
+#' @description Prints output from object produced by ES.cvtmle function
+#'
+#' @param x An object of class "EScvtmle"
+#' @param ... Other arguments to print
+#' @method print EScvtmle
+#' @export print.EScvtmle
+#' @export
+print.EScvtmle <- function(x, ...) {
   if(identical(class(x), "EScvtmle")){
-      if(is.null(x$NCO)==FALSE){
-        cat("Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
-        cat("\n   Without NCO: ", paste(round(x$ATE$b2v, 3), " 95% CI (", round(x$CI$b2v[1],3), " - ", round(x$CI$b2v[2],3), ")", sep=""))
-        cat("\n   RWD included in ", paste((x$proportionselected_mean$b2v*100), "% of folds.", sep=""),"\n")
+    if(is.null(x$NCO)==FALSE){
+      cat("Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
+      cat("\n   Without NCO: ", paste(round(x$ATE$b2v, 3), " 95% CI (", round(x$CI$b2v[1],3), " - ", round(x$CI$b2v[2],3), ")", sep=""))
+      cat("\n   RWD included in ", paste((x$proportionselected_mean$b2v*100), "% of folds.", sep=""),"\n")
 
-        cat("\n Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
-        cat("\n   With NCO: ", paste(round(x$ATE$ncobias, 3), " 95% CI (", round(x$CI$ncobias[1],3), " - ", round(x$CI$ncobias[2],3), ")", sep=""))
-        cat("\n   RWD included in ", paste((x$proportionselected_mean$ncobias*100), "% of folds.", sep=""),"\n")
-      } else {
-        cat("Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
-        cat("\n   Without NCO: ", paste(round(x$ATE$b2v, 3), " 95% CI (", round(x$CI$b2v[1],3), " - ", round(x$CI$b2v[2],3), ")", sep=""))
-        cat("\n   RWD included in ", paste((x$proportionselected_mean$b2v*100), "% of folds.", sep=""),"\n")
-      }
+      cat("\n Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
+      cat("\n   With NCO: ", paste(round(x$ATE$ncobias, 3), " 95% CI (", round(x$CI$ncobias[1],3), " - ", round(x$CI$ncobias[2],3), ")", sep=""))
+      cat("\n   RWD included in ", paste((x$proportionselected_mean$ncobias*100), "% of folds.", sep=""),"\n")
+    } else {
+      cat("Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
+      cat("\n   Without NCO: ", paste(round(x$ATE$b2v, 3), " 95% CI (", round(x$CI$b2v[1],3), " - ", round(x$CI$b2v[2],3), ")", sep=""))
+      cat("\n   RWD included in ", paste((x$proportionselected_mean$b2v*100), "% of folds.", sep=""),"\n")
+    }
+  } else {
+    stop("Error: Object class is not EScvtmle \n")
+  }
+}
+
+#' @title plot.EScvtmle
+#'
+#' @description Plots fold-specific ATE estimates and histogram of monte carlo sample ATE estimates
+#'
+#' @param x An object of class "EScvtmle"
+#' @param ... Other arguments to plot
+#' @method plot EScvtmle
+#' @importFrom ggplot2 ggplot
+#' @importFrom ggplot2 aes
+#' @importFrom ggplot2 geom_hline
+#' @importFrom ggplot2 ggtitle
+#' @importFrom ggplot2 theme
+#' @importFrom ggplot2 element_text
+#' @importFrom ggplot2 geom_histogram
+#' @importFrom ggplot2 labs
+#' @importFrom ggplot2 geom_vline
+#' @importFrom gridExtra grid.arrange
+#' @export plot.EScvtmle
+#' @export
+plot.EScvtmle <- function(x, ...) {
+  if(identical(class(x), "EScvtmle")){
+    Fold <- ATE <- Experiment <- Samples <- NULL
+    if(is.null(x$NCO)==FALSE){
+      df <- data.frame(
+        "Fold"=seq(1,length(x$selected_byfold$ncobias),1),
+        "ATE"=x$foldATEs$ncobias,
+        "Experiment"=as.factor(x$selected_byfold$ncobias)
+      )
+      xdf <- data.frame("Samples"=x$limitdistributionsample$nco)
+      plot1 <- ggplot(df, aes(x=Fold, y=ATE, shape=Experiment, color=Experiment)) + geom_point() + geom_hline(yintercept=x$ATE$ncobias) + ggtitle("ATE Estimates by Fold") + theme(plot.title = element_text(hjust = 0.5))
+      plot2 <- ggplot(xdf, aes(x=Samples)) + geom_histogram() + ggtitle("Histogram of Monte Carlo Samples") +labs(y= "Frequency", x = "ATE Estimate", caption = "Red Lines Mark 95% CI") + theme(plot.caption.position = "plot", plot.caption = element_text(hjust = 0), plot.title = element_text(hjust = 0.5)) + geom_vline(xintercept = x$CI$ncobias, color="red")
+
+      grid.arrange(plot1, plot2, ncol=2)
+
+    } else {
+      df <- data.frame(
+        "Fold"=seq(1,length(x$selected_byfold$b2v),1),
+        "ATE"=x$foldATEs$b2v,
+        "Experiment"=x$selected_byfold$b2v
+      )
+      xdf <- data.frame("Samples"=x$limitdistributionsample$b2v)
+      plot1 <- ggplot(df, aes(x=Fold, y=ATE, shape=Experiment, color=Experiment)) + geom_point() + geom_hline(yintercept=x$ATE$b2v) + ggtitle("ATE Estimates by Fold") + theme(plot.title = element_text(hjust = 0.5))
+      plot2 <- ggplot(xdf, aes(x=Samples)) + geom_histogram() + ggtitle("Histogram of Monte Carlo Samples") +labs(y= "Frequency", x = "ATE Estimate", caption = "Red Lines Mark 95% CI") + theme(plot.caption.position = "plot", plot.caption = element_text(hjust = 0), plot.title = element_text(hjust = 0.5)) + geom_vline(xintercept = x$CI$b2v, color="red")
+
+    }
   } else {
     stop("Error: Object class is not EScvtmle \n")
   }
