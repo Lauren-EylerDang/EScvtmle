@@ -105,7 +105,6 @@ data(wash)
 dat <- wash[which(wash$study \%in\% c(1,2)),]
 #For biased external controls, use:
 #dat <- wash[which(wash$study \%in\% c(1,3)),]
-library(SuperLearner)
 set.seed(2022)
 results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           data=dat, study="study",
