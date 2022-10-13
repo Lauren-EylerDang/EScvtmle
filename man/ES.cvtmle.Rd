@@ -32,19 +32,19 @@ ES.cvtmle(
 )
 }
 \arguments{
-\item{txinrwd}{Whether active treatment is available in RWD (TRUE/FALSE)}
+\item{txinrwd}{Whether active treatment is available in RWD (TRUE/FALSE). If FALSE, only the control arm of the RCT will be augmented with external data.}
 
 \item{data}{The dataset}
 
-\item{study}{Character name of variable indicating study participation (e.g. "S"). This variable should take values of 1 for the RCT and can take other values for the other study. Note that the code is currently set up only to handle two studies, but may be expanded to handle multiple studies in the future.}
+\item{study}{Character name of variable indicating study participation (e.g. "S"). This variable should take a value of 1 for the RCT and should take other values for the other study(ies). Note that the code is currently set up only to handle two studies, but may be expanded to handle multiple studies in the future.}
 
 \item{covariates}{Vector of character names of covariates to be adjusted for (e.g. c("W1", "W2"))}
 
 \item{treatment_var}{Character name of treatment variable (e.g. "A")}
 
-\item{treatment}{Name of treatment of interest (e.g. "DrugName" or 1)}
+\item{treatment}{Value of treatment variable that corresponds to the active treatment (e.g. "DrugName" or 1). All other values of the treatment variable are assumed to be control.}
 
-\item{outcome}{Character name of outcome variable (e.g. "Y"). If Y is a binary variable subject to censoring, it should be coded as 0 for observations that were censored.}
+\item{outcome}{Character name of outcome variable (e.g. "Y"). If the outcome is a binary variable subject to censoring, it should be coded as 0 for observations that were censored.}
 
 \item{NCO}{Character name of negative control outcome variable (e.g. "nco") or NULL if no NCO available. If NCO is a binary variable subject to censoring, it should be coded as 0 for observations that were censored.}
 
@@ -72,24 +72,39 @@ ES.cvtmle(
 
 \item{family_nco}{Family for negative control outcome}
 
-\item{fluctuation}{'logistic' (default for binary and continuos outcomes), or 'linear' describing fluctuation for TMLE updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.}
+\item{fluctuation}{'logistic' (default for binary and continuous outcomes), or 'linear' describing fluctuation for TMLE updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.}
 
-\item{comparisons}{A vector of the values of study variable S that you would like to consider. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD.}
+\item{comparisons}{A list of the values of the study variable that you would like to compare. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD.}
 
-\item{adjustnco}{Should we adjust for the NCO as a proxy of bias in the estimation of the ATE of A on Y? (TRUE/FALSE)}
+\item{adjustnco}{Should we adjust for the NCO as a proxy of bias in the estimation of the ATE of A on Y? (TRUE/FALSE). Default is FALSE.}
 
-\item{target.gwt}{As in tmle package, when TRUE, move g from denominator of clever covariate to the weight when fitting coefficient for TMLE updating.}
+\item{target.gwt}{As in the tmle R package (Gruber & van der Laan, 2012), if target.gwt is TRUE, the treatment mechanism is moved from the denominator of the clever covariate to the weight when fitting the coefficient for TMLE updating. Default TRUE.}
 }
 \value{
-Returns the ATE estimate with 95% confidence intervals for the Experiment-Selector CV-TMLE and the proportion of folds in which RWD was included in the estimate.
+Use print.EScvtmle to see the ATE estimate with 95\% confidence intervals for the Experiment-Selector CV-TMLE and the proportion of folds in which RWD was included in the estimate.
 }
 \description{
-Runs Experiment-Selector CV-TMLE for selecting and analyzing optimal experiment as RCT with or without RWD
+This function runs the Experiment-Selector CV-TMLE (Dang et al. 2022) for selecting and analyzing an optimal experiment, where candidate experiments include an RCT with or without various real-world datasets (RWD).
+}
+\details{
+The experiment selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) aims to select the experiment that optimizes the bias-variance tradeoff for estimating a causal average treatment effect where different experiments may include an RCT alone or an RCT combined with real-world data.
+Using cross-validation, the ES-CVTMLE separates the selection of the optimal experiment from the estimation of the ATE for the chosen experiment.
+The estimated bias term in the selector is a function of the difference in conditional mean outcome under control for the RCT compared to the combined experiment.
+In order to help include truly unbiased external data in the analysis, the estimated average treatment effect on a negative control outcome may be added to the bias term in the selector by setting the parameter NCO to the character name of a negative control variable in the dataset.
+For more details about this method, please see Dang et al. (2022).
+
+References:
+
+Dang LE, Tarp JM, Abrahamsen TJ, Kvist K, Buse JB, Petersen M, van der Laan M (2022). A Cross-Validated Targeted Maximum Likelihood Estimator for Data-Adaptive Experiment Selection Applied to the Augmentation of RCT Control Arms with External Data. arXiv:2210.05802 [stat.ME]
+
+Susan Gruber, Mark J. van der Laan (2012). tmle: An R Package for Targeted Maximum Likelihood Estimation. Journal of Statistical Software, 51(13), 1-35. URL <http://www.jstatsoft.org/v51/i13/>.
 }
 \examples{
 data(wash)
 #For unbiased external controls, use:
 dat <- wash[which(wash$study \%in\% c(1,2)),]
+#For biased external controls, use:
+#dat <- wash[which(wash$study \%in\% c(1,3)),]
 library(SuperLearner)
 set.seed(2022)
 results_rwd1 <- ES.cvtmle(txinrwd=TRUE,

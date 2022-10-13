@@ -2,15 +2,19 @@ Package: EScvtmle
 Type: Package
 Title: Experiment-Selector CV-TMLE for Integration of Observational and RCT Data
 Version: 0.1.0
-Author: Lauren Eyler Dang
-Maintainer: Lauren Eyler Dang <lauren.e.eyler@gmail.com>
-Description: The Experiment-Selector CV-TMLE selects the optimal experiment as randomized controlled trial only or randomized controlled trial with real-world data to optimize the estimated bias-variance tradeoff for estimating the average treatment effect. For more details, please see...
+Authors@R: c(
+    person("Lauren Eyler", "Dang", email = "lauren.eyler@berkeley.edu", role = c("cre","aut")),
+    person("Maya", "Petersen", email = "mayaliv@berkeley.edu", role = "aut"),
+    person("Mark", "van der Laan", email = "laan@berkeley.edu", role = "aut"))
+Maintainer: Lauren Eyler Dang <lauren.eyler@berkeley.edu>
+Description: The experiment selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) aims to select the experiment that optimizes the bias-variance tradeoff for estimating a causal average treatment effect where different experiments may include an RCT alone or an RCT combined with real-world data. Using cross-validation, the ES-CVTMLE separates the selection of the optimal experiment from the estimation of the ATE for the chosen experiment. The estimated bias term in the selector is a function of the difference in conditional mean outcome under control for the RCT compared to the combined experiment. In order to help include truly unbiased external data in the analysis, the estimated average treatment effect on a negative control outcome may be added to the bias term in the selector. For more details about this method, please see Dang et al. (2022) [arXiv:2210.05802 [stat.ME]].
 License: GPL-3
 URL: https://github.com/Lauren-EylerDang/EScvtmle/tree/master
 BugReports: https://github.com/Lauren-EylerDang/EScvtmle/issues
-Depends: R (>= 4.2)
+Depends: 
+    R (>= 4.2),
+    SuperLearner (>= 2.0.28)
 Imports: 
-    SuperLearner (>= 2.0.28),
     origami (>= 1.0.5),
     dplyr (>= 1.0.8),
     MASS (>= 7.3.54),

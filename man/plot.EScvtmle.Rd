@@ -12,5 +12,5 @@
 \item{...}{Other arguments to plot}
 }
 \description{
-Plots fold-specific ATE estimates and histogram of monte carlo sample ATE estimates
+Plots fold-specific ATE estimates and a histogram of Monte Carlo sample ATE estimates used to construct confidence intervals.
 }
