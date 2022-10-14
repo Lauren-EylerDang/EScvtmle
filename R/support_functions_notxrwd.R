@@ -34,7 +34,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="quasibinomial", control = list(saveFitLibrary=TRUE))
+      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
@@ -138,7 +138,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     }
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL_S<- SuperLearner(Y=Ynomiss, X=XSnomiss, SL.library=Q.SL.library, family="quasibinomial", control = list(saveFitLibrary=TRUE))
+      QbarSL_S<- SuperLearner(Y=Ynomiss, X=XSnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
 
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL_S$cvRisk)
@@ -220,7 +220,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       }
 
       if(fluctuation == "logistic"){
-        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="quasibinomial", control = list(saveFitLibrary=TRUE))
+        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
@@ -338,7 +338,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="quasibinomial", control = list(saveFitLibrary=TRUE))
+      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
@@ -441,7 +441,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       }
 
       if(fluctuation == "logistic"){
-        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="quasibinomial", control = list(saveFitLibrary=TRUE))
+        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
