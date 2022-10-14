@@ -6,7 +6,7 @@ For a CRAN submission we recommend that you fix all NOTEs, WARNINGs and ERRORs.
 
 ## R CMD check results
 ❯ On windows-x86_64-devel (r-devel)
-  checking CRAN incoming feasibility ... [14s] NOTE
+  checking CRAN incoming feasibility ... [15s] NOTE
   Maintainer: 'Lauren Eyler Dang <lauren.eyler@berkeley.edu>'
   
   New submission
@@ -18,14 +18,14 @@ For a CRAN submission we recommend that you fix all NOTEs, WARNINGs and ERRORs.
     al (11:870)
     et (11:867)
     
-Comments: This is a new submission. The possibly misspelled words are abbreviations that are either common or were previously defined.
+Comment: This is a new submission. The possibly misspelled words are abbreviations that are either common or previously defined.
 
 ❯ On windows-x86_64-devel (r-devel)
-  checking examples ... [13s] NOTE
+  checking examples ... [20s] NOTE
   Examples with CPU (user + system) or elapsed time > 5s
             user system elapsed
-  ES.cvtmle 5.45   0.24    5.71
-  wash      5.39   0.14    5.53
+  ES.cvtmle 8.56   0.39    9.08
+  wash      8.41   0.09    8.59
 
 ❯ On windows-x86_64-devel (r-devel)
   checking for detritus in the temp directory ... NOTE
@@ -44,11 +44,19 @@ Comments: This is a new submission. The possibly misspelled words are abbreviati
     et (11:867)
     RCT (4:9, 11:268, 11:284, 11:587)
     TMLE (3:31)
-    
-Comments: This is a new submission. The possibly misspelled words are abbreviations that are either common or were previously defined.
+
+Comment: This is a new submission. The possibly misspelled words are abbreviations that are either common or previously defined.
+
+
+❯ On ubuntu-gcc-release (r-release)
+  checking examples ... NOTE
+  Examples with CPU (user + system) or elapsed time > 5s
+             user system elapsed
+  ES.cvtmle 8.695  0.043  18.443
+  wash      8.551  0.012  17.945
 
 ❯ On fedora-clang-devel (r-devel)
-  checking CRAN incoming feasibility ... [4s/13s] NOTE
+  checking CRAN incoming feasibility ... [6s/22s] NOTE
   Maintainer: ‘Lauren Eyler Dang <lauren.eyler@berkeley.edu>’
   
   New submission
@@ -60,10 +68,18 @@ Comments: This is a new submission. The possibly misspelled words are abbreviati
     al (11:870)
     et (11:867)
     
-Comments: This is a new submission. The possibly misspelled words are abbreviations that are either common or were previously defined.
+Comment: This is a new submission. The possibly misspelled words are abbreviations that are either common or previously defined.
+
+
+❯ On fedora-clang-devel (r-devel)
+  checking examples ... [20s/42s] NOTE
+  Examples with CPU (user + system) or elapsed time > 5s
+             user system elapsed
+  ES.cvtmle 8.942  0.018  18.547
+  wash      8.781  0.013  19.170
 
 ❯ On fedora-clang-devel (r-devel)
   checking HTML version of manual ... NOTE
   Skipping checking HTML validation: no command 'tidy' found
 
-0 errors ✔ | 0 warnings ✔ | 6 notes ✖
+0 errors ✔ | 0 warnings ✔ | 8 notes ✖

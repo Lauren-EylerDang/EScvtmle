@@ -47,7 +47,6 @@
 #' #For biased external controls, use:
 #' #dat <- wash[which(wash$study %in% c(1,3)),]
 #' set.seed(2022)
-#' library(SuperLearner)
 #' results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
 #'                           data=dat, study="study",
 #'                           covariates=c("aged", "sex", "momedu", "hfiacat"),
