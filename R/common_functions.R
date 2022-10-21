@@ -166,6 +166,8 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
     out$psi[[v]] <- vector()
   }
 
+  out$clevercov <- list()
+
   for(s in 1:length(comparisons)){
 
     #select experiment subset
@@ -224,10 +226,15 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
       validmat[which(data$S %in% comparisons[[s]]),]$Qbar0W.star<- validmat[which(data$S %in% comparisons[[s]]),]$Qbar0W + epsilon*H.0W[which(data$S %in% comparisons[[s]])]
     }
 
+    out$clevercov[[s]] <- rep(NA, nrow(data))
+
     for(v in 1:V){
       out$psi[[v]][s] <- mean((validmat$Qbar1W.star - validmat$Qbar0W.star)[which(validmat$v==v & (data$S %in% comparisons[[s]]))])
       out$EICay[which(data$v==v & (data$S %in% comparisons[[s]])),(length(comparisons)*(v-1)+s)] <- ((wt*H.AW)*(data$Y - validmat$QbarAW.star) + validmat$Qbar1W.star - validmat$Qbar0W.star - out$psi[[v]][s])[which(data$v==v & (data$S %in% comparisons[[s]]))]/((length(which(data$v==v & (data$S %in% comparisons[[s]]))))/nrow(data))
+      out$clevercov[[s]][which(data$v==v & (data$S %in% comparisons[[s]]) & data$Delta==1)] <- (wt*H.AW)[which(data$v==v & (data$S %in% comparisons[[s]]) & data$Delta==1)]
     }
+
+    out$clevercov[[s]] <- na.omit(out$clevercov[[s]])
 
     if(s==1){
       pooledVar <- list()
@@ -236,6 +243,7 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
       }
       out$Var <- mean(unlist(pooledVar))
     }
+
 
   }
 

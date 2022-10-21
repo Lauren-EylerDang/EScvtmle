@@ -1,6 +1,6 @@
 #' @title ES.cvtmle
 #'
-#' @description This function runs the Experiment-Selector CV-TMLE (Dang et al. 2022) for selecting and analyzing an optimal experiment, where candidate experiments include an RCT with or without various real-world datasets (RWD).
+#' @description This function runs the experiment-selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) (Dang et al. 2022) for selecting and analyzing an optimal experiment, where candidate experiments include a randomized controlled trial (RCT) with or without various real-world datasets (RWD).
 #'
 #' @param txinrwd Whether active treatment is available in RWD (TRUE/FALSE). If FALSE, only the control arm of the RCT will be augmented with external data.
 #' @param data The dataset
@@ -13,7 +13,7 @@
 #' @param Delta Character name of a variable that is 0 if an observation was censored (missing binary outcome) and 1 otherwise. Missing outcomes may also be coded as NA, in which case a Delta variable will be added internally. If no missing outcomes, set Delta=NULL.
 #' @param Delta_NCO Character name of a variable that is 0 if the value of NCO is missing and 1 otherwise. Missing NCOs may also be coded as NA, in which case a Delta_NCO variable will be added internally. If no missing NCO or no NCO, set Delta_NCO=NULL.
 #' @param pRCT The probability of randomization to treatment in the RCT
-#' @param V Number of cross-validation folds (default 10).
+#' @param V Number of cross-validation folds (default 10)
 #' @param Q.SL.library Candidate algorithms for SuperLearner estimation of outcome regressions
 #' @param d.SL.library Candidate algorithms for SuperLearner estimation of missingness mechanism
 #' @param g.SL.library Candidate algorithms for SuperLearner estimation of treatment mechanism for combined RCT/RWD analysis
@@ -22,7 +22,7 @@
 #' @param g.discreteSL Should a discrete SuperLearner be used for estimation of treatment mechanism? (TRUE/FALSE)
 #' @param family Either "binomial" for binary outcomes or "gaussian" for continuous outcomes
 #' @param family_nco Family for negative control outcome
-#' @param fluctuation 'logistic' (default for binary and continuous outcomes), or 'linear' describing fluctuation for TMLE updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.
+#' @param fluctuation 'logistic' (default for binary and continuous outcomes), or 'linear' describing fluctuation for targeted maximum likelihood estimation (TMLE) updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.
 #' @param comparisons A list of the values of the study variable that you would like to compare. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD.
 #' @param adjustnco Should we adjust for the NCO as a proxy of bias in the estimation of the ATE of A on Y? (TRUE/FALSE). Default is FALSE.
 #' @param target.gwt As in the tmle R package (Gruber & van der Laan, 2012), if target.gwt is TRUE, the treatment mechanism is moved from the denominator of the clever covariate to the weight when fitting the coefficient for TMLE updating. Default TRUE.
@@ -37,7 +37,17 @@
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 geom_point
 #'
-#' @return Use print.EScvtmle to see the ATE estimate with 95\% confidence intervals for the Experiment-Selector CV-TMLE and the proportion of folds in which RWD was included in the estimate.
+#' @return Returns an object of class "EScvtmle" that is a list with the following components.
+#' \describe{
+#'  \item{ATE}{Average treatment effect (ATE) point estimates for the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+#'  \item{foldATEs}{Average treatment effect (ATE) point estimates for each cross-validation fold of the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+#'  \item{g}{g is a list of the same length as comparisons where each element of the list is a vector of the denominator of the covariate in front of the residual in the efficient influence curve for all observations in the experiment described by that element of comparisons. Values of g close to 0 or 1 indicate practical near-positivity violations.}
+#'  \item{CI}{Estimated 95\% confidence intervals for the average treatment effect estimates of the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+#'  \item{limitdistributionsample}{Monte Carlo samples for the average treatment effect estimates of the ES-CVTMLE estimator that are used to construct confidence intervals for the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+#'  \item{Var}{Estimated variance of the ES-CVTMLE average treatment effect estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+#'  \item{selected_byfold}{Vector noting which experiment from the list of comparisons was selected in each cross-validation fold of the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+#'  \item{proportionselected}{Proportion of all cross-validation folds in which real-world (external) data were included in the analysis for the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+#' }
 #'
 #' @details The experiment selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) aims to select the experiment that optimizes the bias-variance tradeoff for estimating a causal average treatment effect where different experiments may include an RCT alone or an RCT combined with real-world data.
 #' Using cross-validation, the ES-CVTMLE separates the selection of the optimal experiment from the estimation of the ATE for the chosen experiment.
@@ -52,11 +62,9 @@
 #' Susan Gruber, Mark J. van der Laan (2012). tmle: An R Package for Targeted Maximum Likelihood Estimation. Journal of Statistical Software, 51(13), 1-35. URL <http://www.jstatsoft.org/v51/i13/>.
 #'
 #' @examples
-#' data(wash)
+#' \donttest{data(wash)
 #' #For unbiased external controls, use:
 #' dat <- wash[which(wash$study %in% c(1,2)),]
-#' #For biased external controls, use:
-#' #dat <- wash[which(wash$study %in% c(1,3)),]
 #' set.seed(2022)
 #' results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
 #'                           data=dat, study="study",
@@ -69,6 +77,7 @@
 #'                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
 #'                           comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
 #' print.EScvtmle(results_rwd1)
+#' }
 #' @export
 
 ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE){
@@ -90,9 +99,17 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   ids <- data$S
 
   if(txinrwd==TRUE){
-    ids[which(data$S==1)] <- 0
+    if(family=="binomial"){
+      ids[which(data$S==1 & data$Y==1)] <- 0
+    } else {
+      ids[which(data$S==1)] <- 0
+    }
   } else {
-    ids[which(data$S==1 & data$A==0)] <- 0
+    if(family=="binomial"){
+      ids[which(data$S==1 & data$A==0 & data$Y==1)] <- 0
+    } else {
+      ids[which(data$S==1 & data$A==0)] <- 0
+    }
   }
 
   folds <- make_folds(data, fold_fun = folds_vfold, V=V, strata_ids = ids)
@@ -172,6 +189,12 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   #estimate components of limit distribution
   limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons)
 
+  results$g <- list()
+  for(s in 1:length(comparisons)){
+    results$g[[s]] <- as.vector(1/(limitdist$clevercov[[s]]))
+  }
+
+
   pool <- vector()
   for(v in 1:V){
     pool[v]<- limitdist$psi[[v]][proportionselected$b2v[[v]]]
@@ -186,6 +209,8 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
     }
     results$foldATEs$ncobias <- pool
     results$ATE$ncobias <- mean(pool)
+  } else {
+    results$ATE$ncobias <- results$foldATEs$ncobias <- NULL
   }
 
   #sample from limit distribution
@@ -215,16 +240,18 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
       results$Var$ncobias <- limitdist$Var
       results$CI$ncobias <- c((results$ATE$ncobias - 1.96*(limitdist$Var)^(1/2)), (results$ATE$ncobias + 1.96*(limitdist$Var)^(1/2)))
     }
+  } else {
+    results$Var$ncobias <- results$CI$ncobias <- NULL
   }
 
   results$selected_byfold <- list()
   results$selected_byfold$b2v <- unlist(proportionselected$b2v)
   results$selected_byfold$ncobias <- unlist(proportionselected$ncobias)
 
-  results$proportionselected_mean <- list()
-  results$proportionselected_mean$b2v <- (mean(unlist(proportionselected$b2v))-1)
+  results$proportionselected <- list()
+  results$proportionselected$b2v <- (mean(unlist(proportionselected$b2v))-1)
   if(is.null(NCO)==FALSE){
-    results$proportionselected_mean$ncobias <- (mean(unlist(proportionselected$ncobias))-1)
+    results$proportionselected$ncobias <- (mean(unlist(proportionselected$ncobias))-1)
   }
   results$NCO <- NCO
 
@@ -240,6 +267,8 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
 #' @param x An object of class "EScvtmle"
 #' @param ... Other arguments to print
 #' @method print EScvtmle
+#' @details Prints the average treatment effect (ATE) point estimate and 95\% confidence interval for the ES-CVTMLE estimator (object of class "EScvtmle") using the estimated bias squared plus variance experiment-selector. If a negative control outcome (NCO) is available, this function also prints the ATE point estimate and 95\% confidence interval for the selector that includes the estimated ATE on the NCO in the bias term. See Dang et al. (2022) <arXiv:2210.05802> for more details.
+#' @return No return value. Called to print a summary of the results for objects of class "EScvtmle".
 #' @export print.EScvtmle
 #' @export
 print.EScvtmle <- function(x, ...) {
@@ -247,15 +276,15 @@ print.EScvtmle <- function(x, ...) {
     if(is.null(x$NCO)==FALSE){
       cat("Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
       cat("\n   Without NCO: ", paste(round(x$ATE$b2v, 3), " 95% CI (", round(x$CI$b2v[1],3), " - ", round(x$CI$b2v[2],3), ")", sep=""))
-      cat("\n   RWD included in ", paste((x$proportionselected_mean$b2v*100), "% of folds.", sep=""),"\n")
+      cat("\n   RWD included in ", paste((x$proportionselected$b2v*100), "% of folds.", sep=""),"\n")
 
       cat("\n Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
       cat("\n   With NCO: ", paste(round(x$ATE$ncobias, 3), " 95% CI (", round(x$CI$ncobias[1],3), " - ", round(x$CI$ncobias[2],3), ")", sep=""))
-      cat("\n   RWD included in ", paste((x$proportionselected_mean$ncobias*100), "% of folds.", sep=""),"\n")
+      cat("\n   RWD included in ", paste((x$proportionselected$ncobias*100), "% of folds.", sep=""),"\n")
     } else {
       cat("Experiment-Selector CV-TMLE Average Treatment Effect Estimate")
       cat("\n   Without NCO: ", paste(round(x$ATE$b2v, 3), " 95% CI (", round(x$CI$b2v[1],3), " - ", round(x$CI$b2v[2],3), ")", sep=""))
-      cat("\n   RWD included in ", paste((x$proportionselected_mean$b2v*100), "% of folds.", sep=""),"\n")
+      cat("\n   RWD included in ", paste((x$proportionselected$b2v*100), "% of folds.", sep=""),"\n")
     }
   } else {
     stop("Error: Object class is not EScvtmle \n")
@@ -264,7 +293,7 @@ print.EScvtmle <- function(x, ...) {
 
 #' @title plot.EScvtmle
 #'
-#' @description Plots fold-specific ATE estimates and a histogram of Monte Carlo sample ATE estimates used to construct confidence intervals.
+#' @description Plots fold-specific average treatment effect (ATE) estimates and a histogram of Monte Carlo sample ATE estimates used to construct confidence intervals.
 #'
 #' @param x An object of class "EScvtmle"
 #' @param ... Other arguments to plot
@@ -279,6 +308,7 @@ print.EScvtmle <- function(x, ...) {
 #' @importFrom ggplot2 labs
 #' @importFrom ggplot2 geom_vline
 #' @importFrom gridExtra grid.arrange
+#' @return Returns a graphical object of class "grob" that contains two side-by-side plots: one of the fold-specific average treatment effect estimates for all cross-validation folds (including information regarding which experiment was selected in each fold), and the other of a histogram of the Monte Carlo samples that are used to construct confidence intervals. If a negative control outcome (NCO) is available, the plots are for the selector that includes the estimated average treatment effect on the NCO in the bias estimate. If not, the plots are for the selector that uses the estimated bias squared plus the variance selector, without information from an NCO. For more information about the different selectors, the use of cross-validation, or the construction of confidence intervals for this method, please see Dang et al. (2022)  <arXiv:2210.05802>.
 #' @export plot.EScvtmle
 #' @export
 plot.EScvtmle <- function(x, ...) {
@@ -300,12 +330,13 @@ plot.EScvtmle <- function(x, ...) {
       df <- data.frame(
         "Fold"=seq(1,length(x$selected_byfold$b2v),1),
         "ATE"=x$foldATEs$b2v,
-        "Experiment"=x$selected_byfold$b2v
+        "Experiment"=as.factor(x$selected_byfold$b2v)
       )
       xdf <- data.frame("Samples"=x$limitdistributionsample$b2v)
       plot1 <- ggplot(df, aes(x=Fold, y=ATE, shape=Experiment, color=Experiment)) + geom_point() + geom_hline(yintercept=x$ATE$b2v) + ggtitle("ATE Estimates by Fold") + theme(plot.title = element_text(hjust = 0.5))
       plot2 <- ggplot(xdf, aes(x=Samples)) + geom_histogram() + ggtitle("Histogram of Monte Carlo Samples for Confidence Interval Estimation") +labs(y= "Frequency", x = "ATE Estimate", caption = "Red Lines Mark 95% CI") + theme(plot.caption.position = "plot", plot.caption = element_text(hjust = 0), plot.title = element_text(hjust = 0.5)) + geom_vline(xintercept = x$CI$b2v, color="red")
 
+      grid.arrange(plot1, plot2, ncol=2)
     }
   } else {
     stop("Error: Object class is not EScvtmle \n")

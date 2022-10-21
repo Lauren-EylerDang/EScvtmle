@@ -54,7 +54,7 @@ ES.cvtmle(
 
 \item{pRCT}{The probability of randomization to treatment in the RCT}
 
-\item{V}{Number of cross-validation folds (default 10).}
+\item{V}{Number of cross-validation folds (default 10)}
 
 \item{Q.SL.library}{Candidate algorithms for SuperLearner estimation of outcome regressions}
 
@@ -72,7 +72,7 @@ ES.cvtmle(
 
 \item{family_nco}{Family for negative control outcome}
 
-\item{fluctuation}{'logistic' (default for binary and continuous outcomes), or 'linear' describing fluctuation for TMLE updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.}
+\item{fluctuation}{'logistic' (default for binary and continuous outcomes), or 'linear' describing fluctuation for targeted maximum likelihood estimation (TMLE) updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.}
 
 \item{comparisons}{A list of the values of the study variable that you would like to compare. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD.}
 
@@ -81,10 +81,20 @@ ES.cvtmle(
 \item{target.gwt}{As in the tmle R package (Gruber & van der Laan, 2012), if target.gwt is TRUE, the treatment mechanism is moved from the denominator of the clever covariate to the weight when fitting the coefficient for TMLE updating. Default TRUE.}
 }
 \value{
-Use print.EScvtmle to see the ATE estimate with 95\% confidence intervals for the Experiment-Selector CV-TMLE and the proportion of folds in which RWD was included in the estimate.
+Returns an object of class "EScvtmle" that is a list with the following components.
+\describe{
+ \item{ATE}{Average treatment effect (ATE) point estimates for the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+ \item{foldATEs}{Average treatment effect (ATE) point estimates for each cross-validation fold of the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+ \item{g}{g is a list of the same length as comparisons where each element of the list is a vector of the denominator of the covariate in front of the residual in the efficient influence curve for all observations in the experiment described by that element of comparisons. Values of g close to 0 or 1 indicate practical near-positivity violations.}
+ \item{CI}{Estimated 95\% confidence intervals for the average treatment effect estimates of the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+ \item{limitdistributionsample}{Monte Carlo samples for the average treatment effect estimates of the ES-CVTMLE estimator that are used to construct confidence intervals for the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+ \item{Var}{Estimated variance of the ES-CVTMLE average treatment effect estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+ \item{selected_byfold}{Vector noting which experiment from the list of comparisons was selected in each cross-validation fold of the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+ \item{proportionselected}{Proportion of all cross-validation folds in which real-world (external) data were included in the analysis for the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
+}
 }
 \description{
-This function runs the Experiment-Selector CV-TMLE (Dang et al. 2022) for selecting and analyzing an optimal experiment, where candidate experiments include an RCT with or without various real-world datasets (RWD).
+This function runs the experiment-selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) (Dang et al. 2022) for selecting and analyzing an optimal experiment, where candidate experiments include a randomized controlled trial (RCT) with or without various real-world datasets (RWD).
 }
 \details{
 The experiment selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) aims to select the experiment that optimizes the bias-variance tradeoff for estimating a causal average treatment effect where different experiments may include an RCT alone or an RCT combined with real-world data.
@@ -100,11 +110,9 @@ Dang LE, Tarp JM, Abrahamsen TJ, Kvist K, Buse JB, Petersen M, van der Laan M (2
 Susan Gruber, Mark J. van der Laan (2012). tmle: An R Package for Targeted Maximum Likelihood Estimation. Journal of Statistical Software, 51(13), 1-35. URL <http://www.jstatsoft.org/v51/i13/>.
 }
 \examples{
-data(wash)
+\donttest{data(wash)
 #For unbiased external controls, use:
 dat <- wash[which(wash$study \%in\% c(1,2)),]
-#For biased external controls, use:
-#dat <- wash[which(wash$study \%in\% c(1,3)),]
 set.seed(2022)
 results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           data=dat, study="study",
@@ -117,4 +125,5 @@ results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                           comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
 print.EScvtmle(results_rwd1)
+}
 }

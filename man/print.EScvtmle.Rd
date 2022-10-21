@@ -11,6 +11,12 @@
 
 \item{...}{Other arguments to print}
 }
+\value{
+No return value. Called to print a summary of the results for objects of class "EScvtmle".
+}
 \description{
 Prints output from object produced by ES.cvtmle function
+}
+\details{
+Prints the average treatment effect (ATE) point estimate and 95\% confidence interval for the ES-CVTMLE estimator (object of class "EScvtmle") using the estimated bias squared plus variance experiment-selector. If a negative control outcome (NCO) is available, this function also prints the ATE point estimate and 95\% confidence interval for the selector that includes the estimated ATE on the NCO in the bias term. See Dang et al. (2022) <arXiv:2210.05802> for more details.
 }
