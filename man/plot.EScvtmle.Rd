@@ -11,6 +11,9 @@
 
 \item{...}{Other arguments to plot}
 }
+\value{
+Returns a graphical object of class "grob" that contains two side-by-side plots: one of the fold-specific average treatment effect estimates for all cross-validation folds (including information regarding which experiment was selected in each fold), and the other of a histogram of the Monte Carlo samples that are used to construct confidence intervals. If a negative control outcome (NCO) is available, the plots are for the selector that includes the estimated average treatment effect on the NCO in the bias estimate. If not, the plots are for the selector that uses the estimated bias squared plus the variance selector, without information from an NCO. For more information about the different selectors, the use of cross-validation, or the construction of confidence intervals for this method, please see Dang et al. (2022)  <arXiv:2210.05802>.
+}
 \description{
-Plots fold-specific ATE estimates and a histogram of Monte Carlo sample ATE estimates used to construct confidence intervals.
+Plots fold-specific average treatment effect (ATE) estimates and a histogram of Monte Carlo sample ATE estimates used to construct confidence intervals.
 }
