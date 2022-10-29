@@ -60,6 +60,7 @@ fluctuation = "logistic"
 comparisons = list(c(1),c(1,2))
 adjustnco = FALSE
 target.gwt = TRUE
+bounds=NULL
 
 data <- preprocess(txinrwd=FALSE, data=data, study="S", covariates=c("W1", "W2"), treatment_var="A", treatment=1, outcome="Y", NCO="nco", Delta=NULL, Delta_NCO=NULL, adjustnco=FALSE)
 if("Delta" %in% colnames(data)){
@@ -88,7 +89,7 @@ train <- data[sort(folds[[v]]$training_set),]
 check <- selector_func_notxrwd(train_s=train, data, Q.SL.library=c("SL.glm"), d.SL.library=NULL, g.SL.library=c("SL.glm"),
                              pRCT = 0.5, family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                              NCO="nco", Delta=NULL, Delta_NCO = NULL,
-                             adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE)
+                             adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, bounds)
 
 
 #tests for selector_func_notxrwd
@@ -115,7 +116,7 @@ test_that("Estimating missingness mechanism if missing outcomes", {
   out <- selector_func_notxrwd(train_s=dat, data, Q.SL.library=c("SL.glm"), d.SL.library=c("SL.glm"), g.SL.library=c("SL.glm"),
                              pRCT = 0.5, family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                              NCO=NULL, Delta="Delta", Delta_NCO = NULL,
-                             adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE)
+                             adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, bounds)
   expect_true(is.null(out$DbarSL)==FALSE)
 
 })
@@ -125,12 +126,12 @@ test_that("Known randomization probability used for RCT only", {
   out <- selector_func_notxrwd(train_s=dat1, data, Q.SL.library=c("SL.glm"), d.SL.library=c("SL.glm"), g.SL.library=c("SL.glm"),
                              pRCT = 0.5, family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                              NCO=NULL, Delta=NULL, Delta_NCO = NULL,
-                             adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE)
+                             adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, bounds)
   expect_equal(out$wt, rep(2, length(out$wt)))
   out <- selector_func_notxrwd(train_s=dat1, data, Q.SL.library=c("SL.glm"), d.SL.library=c("SL.glm"), g.SL.library=c("SL.glm"),
                              pRCT = 0.5, family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                              NCO=NULL, Delta=NULL, Delta_NCO = NULL,
-                             adjustnco=FALSE, target.gwt=FALSE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE)
+                             adjustnco=FALSE, target.gwt=FALSE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, bounds)
   expect_equal(out$H.AW[which(dat1$A==1)], rep(2, length(which(dat1$A==1))))
   expect_equal(out$H.AW[which(dat1$A==0)], rep(-2, length(which(dat1$A==0))))
 })
@@ -139,7 +140,7 @@ test_that("nco scaled appropriately if continuous outcome with logistic fluctuat
   out <- selector_func_notxrwd(train_s=train, data, Q.SL.library=c("SL.glm"), d.SL.library=NULL, g.SL.library=c("SL.glm"),
                              pRCT = 0.5, family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                              NCO=NULL, Delta=NULL, Delta_NCO = NULL,
-                             adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE)
+                             adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, bounds)
   expect_true(all(out$nco>=0))
   expect_true(all(out$nco<=1))
 })
@@ -150,7 +151,7 @@ test_that("Predictions for missingness mechanism working as expected", {
   out <- selector_func_notxrwd(train_s=dat1, data, Q.SL.library=c("SL.glm"), d.SL.library=c("SL.glm"), g.SL.library=c("SL.glm"),
                              pRCT = 0.5, family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                              NCO=NULL, Delta="Delta", Delta_NCO = NULL,
-                             adjustnco=FALSE, target.gwt=FALSE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE)
+                             adjustnco=FALSE, target.gwt=FALSE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, bounds)
   expect_equal(mean(predict(out$DbarSL, newdata = dat1[which(dat1$A==1),])), mean(dat1$Delta[which(dat1$A==1)]))
 })
 
@@ -162,7 +163,7 @@ train <- data[sort(folds[[v]]$training_set),]
 out <- list()
 out[[1]] <- apply_selector_func(txinrwd=FALSE, train=train, data, Q.SL.library=c("SL.glm"), d.SL.library=c("SL.glm"), g.SL.library=c("SL.glm"),
                                 pRCT=0.5, family="gaussian", family_nco="gaussian", fluctuation="logistic", NCO="nco", Delta=NULL, Delta_NCO=NULL,
-                                adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, comparisons=list(c(1),c(1,2)))
+                                adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, comparisons=list(c(1),c(1,2)), bounds)
 check <- bvt_notxinrwd(v=1, selector=out, NCO="nco", comparisons=list(c(1),c(1,2)), train=train, data=data, fluctuation="logistic", family="gaussian")
 
 test_that("Solves EICs", {

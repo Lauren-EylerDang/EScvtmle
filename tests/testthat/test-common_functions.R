@@ -27,6 +27,7 @@ fluctuation = "logistic"
 comparisons = list(c(1),c(1,2))
 adjustnco = FALSE
 target.gwt = TRUE
+bounds = NULL
 
 
 
@@ -38,6 +39,12 @@ test_that(".bound works", {
 test_that("Bounds for denominator of clever covariate between 0 and 1", {
   expect_true(.bound(0.001,100)>0)
   expect_true(.bound(0.999,100)<1)
+})
+
+test_that(".bound respects user-specified bounds", {
+  expect_equal(.bound(0.001,10000), 0.005428681)
+  expect_true(.bound(0.001,10000, bounds = c(0.025,0.975))==0.025)
+  expect_true(.bound(0.999,10000, bounds = c(0.025,0.975))==0.975)
 })
 
 #tests for preprocess function
@@ -95,7 +102,7 @@ test_that("Confirm correct processing of missing outcomes for outcome and nco", 
 test_that("Confirm correct processing of missing outcomes for outcome and nco", {
   dat1 <- data
   check <- preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged", "sex"), treatment_var="treatment", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
-  check2 <- apply_selector_func(txinrwd, train=check, data=check, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons)
+  check2 <- apply_selector_func(txinrwd, train=check, data=check, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons, bounds)
   expect_equal(length(check$Y[which(check$S==1)]), length(check2[[1]]$Y))
 })
 
@@ -158,7 +165,7 @@ for(v in 1:length(folds)){
   #define training set
   train <- data[sort(folds[[v]]$training_set),]
 
-  selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons)
+  selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons, bounds)
 
   if(txinrwd==TRUE){
     bvt[[v]] <- bvt_txinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
@@ -208,7 +215,7 @@ results$foldATEs <- list()
 results$foldATEs$b2v <- vector()
 results$foldATEs$ncobias <- vector()
 
-limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons)
+limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons, bounds)
 
 test_that("Solved EICs", {
   expect_equal(mean(limitdist$EICay), 0)

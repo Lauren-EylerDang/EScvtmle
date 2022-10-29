@@ -1,17 +1,22 @@
 #'
 #bound denominator of clever covariates
-.bound <- function(x,n){
-  x <- pmax((5/(n)^(1/2)/log(n)), pmin(1,x))
+.bound <- function(x,n, bounds=NULL){
+  if(is.null(bounds)){
+    x <- pmax((5/(n)^(1/2)/log(n)), pmin(1,x))
+  } else {
+    x <- pmax(bounds[1], pmin(bounds[2],x))
+  }
   return(x)
 }
 
 #' @importFrom dplyr rename
+#' @importFrom tidyselect all_of
 # Function to pre-process data
 # Includes removal of observations from observational dataset with W covariates not represented in RCT if txinrwd==FALSE
 preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco = adjustnco){
 
   #remove observations missing treatment
-  data <- rename(data, A = treatment_var)
+  data <- rename(data, A = all_of(treatment_var))
 
   if(length(which(is.na(data$A)))>0) message("Removing observations with missing treatment variable.")
   data <- data[which(is.na(data$A)==FALSE),]
@@ -19,8 +24,8 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
   #make A coded as 1=treatment of interest, 0=control
   data$A <- ifelse(data$A == treatment, 1, 0)
 
-  data <- rename(data, S = study)
-  data <- rename(data, Y = outcome)
+  data <- rename(data, S = all_of(study))
+  data <- rename(data, Y = all_of(outcome))
 
   if (length(which(data$S>1 & data$A==1))>0 & txinrwd==FALSE) stop("Active treatment available in external data. Set txinrwd==TRUE.")
 
@@ -39,7 +44,7 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
   }
 
   if(is.null(NCO) == FALSE){
-    data <- rename(data, nco = NCO)
+    data <- rename(data, nco = all_of(NCO))
 
     if(adjustnco == TRUE & txinrwd == FALSE){
       whichW <- which(data$S!=1 & (data[,"nco"] < (min(data[which(data$S==1),"nco"]))) | (data[,"nco"] > (max(data[which(data$S==1),"nco"]))))
@@ -49,7 +54,7 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
     }
 
     if(is.null(Delta_NCO)==FALSE){
-      data <- rename(data, NCO_delta = Delta_NCO)
+      data <- rename(data, NCO_delta = all_of(Delta_NCO))
     }
 
     if(any(is.na(data$nco)==TRUE)){
@@ -64,7 +69,7 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
 
 
   if(is.null(Delta)==FALSE){
-    data <- rename(data, Delta = Delta)
+    data <- rename(data, Delta = all_of(Delta))
   }
 
   if(any(is.na(data$Y)==TRUE)){
@@ -85,24 +90,24 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
 
 
 #apply selector_func to different datasets
-apply_selector_func <- function(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons){
+apply_selector_func <- function(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons, bounds){
   out <- list()
   for(s in 1:(length(comparisons))){
 
-    #train regressions on A=0 only
     train_s <- train[which(train$S %in% comparisons[[s]]),]
     train_s$S[which(train_s$S!=1)]<-0
 
     if(txinrwd==TRUE){
-      out[[s]] <- selector_func_txrwd(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL)
+      out[[s]] <- selector_func_txrwd(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, bounds)
     } else {
-      out[[s]] <- selector_func_notxrwd(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL)
+      out[[s]] <- selector_func_notxrwd(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, bounds)
     }
   }
   return(out)
 }
 
 #' @importFrom stats predict
+# Get initial estimates of the conditional mean outcome and treatment mechanism for validation set observations using regressions trained on training sets
 validpreds <- function(data, folds, V, selector, pRCT, Delta, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons){
   out <- list()
   for(s in 1:length(comparisons)){
@@ -156,8 +161,8 @@ validpreds <- function(data, folds, V, selector, pRCT, Delta, Q.discreteSL, d.di
 #' @importFrom stats glm
 #' @importFrom stats plogis
 #' @importFrom stats qlogis
-#function for limit dist var ests
-limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons){
+#function to estimate components of limit distribution of ES-CVTMLE estimator
+limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons, bounds){
   out <- list()
 
   out$EICay <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
@@ -169,8 +174,6 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
   out$clevercov <- list()
 
   for(s in 1:length(comparisons)){
-
-    #select experiment subset
 
     validmat <- valid_initial[[s]]
     validmat$Yscale <- data$Y
@@ -184,16 +187,16 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
     }
 
     if(target.gwt){
-      wt <- as.numeric(data$A==1 & data$Delta==1)/.bound((validmat$gHat1W*validmat$dbar1W),length(which(data$S %in% comparisons[[s]]))) + as.numeric(data$A==0 & data$Delta==1)/.bound(((1-validmat$gHat1W)*validmat$dbar0W),length(which(data$S %in% comparisons[[s]])))
+      wt <- as.numeric(data$A==1 & data$Delta==1)/.bound((validmat$gHat1W*validmat$dbar1W),length(which(data$S %in% comparisons[[s]])), bounds) + as.numeric(data$A==0 & data$Delta==1)/.bound(((1-validmat$gHat1W)*validmat$dbar0W),length(which(data$S %in% comparisons[[s]])), bounds)
       H.AW <- as.numeric(data$A==1 & data$Delta==1) - as.numeric(data$A==0 & data$Delta==1)
       H.1W <- rep(1, nrow(data))
       H.0W <- rep(-1, nrow(data))
 
     } else{
       wt <- rep(1, nrow(data))
-      H.AW <- as.numeric(data$A==1 & data$Delta==1)/.bound((validmat$gHat1W*validmat$dbar1W),length(which(data$S %in% comparisons[[s]]))) - as.numeric(data$A==0 & data$Delta==1)/.bound(((1-validmat$gHat1W)*validmat$dbar0W),length(which(data$S %in% comparisons[[s]])))
-      H.1W <- 1/.bound((validmat$gHat1W*validmat$dbar1W),length(which(data$S %in% comparisons[[s]])))
-      H.0W <- -1/.bound(((1-validmat$gHat1W)*validmat$dbar0W),length(which(data$S %in% comparisons[[s]])))
+      H.AW <- as.numeric(data$A==1 & data$Delta==1)/.bound((validmat$gHat1W*validmat$dbar1W),length(which(data$S %in% comparisons[[s]])), bounds) - as.numeric(data$A==0 & data$Delta==1)/.bound(((1-validmat$gHat1W)*validmat$dbar0W),length(which(data$S %in% comparisons[[s]])), bounds)
+      H.1W <- 1/.bound((validmat$gHat1W*validmat$dbar1W),length(which(data$S %in% comparisons[[s]])), bounds)
+      H.0W <- -1/.bound(((1-validmat$gHat1W)*validmat$dbar0W),length(which(data$S %in% comparisons[[s]])), bounds)
 
     }
 
@@ -234,7 +237,7 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
       out$clevercov[[s]][which(data$v==v & (data$S %in% comparisons[[s]]) & data$Delta==1)] <- (wt*H.AW)[which(data$v==v & (data$S %in% comparisons[[s]]) & data$Delta==1)]
     }
 
-    out$clevercov[[s]] <- na.omit(out$clevercov[[s]])
+    out$clevercov[[s]] <- stats::na.omit(out$clevercov[[s]])
 
     if(s==1){
       pooledVar <- list()
@@ -250,7 +253,7 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
   return(out)
 }
 
-#function for sampling from limit distribution
+#function for sampling from the estimated limit distribution
 
 limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons){
   out <- list()
@@ -280,7 +283,7 @@ limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist
 
   out$covMat <- (t(EICmat)%*%EICmat)/nrow(data)
 
-  #sample from multivariate ztildes
+  #sample from multivariate ztilde
   ztilde_samp <- mvrnorm(n = 1000, mu=rep(0,ncol(EICmat)), Sigma=out$covMat/nrow(data))
 
   #selector for each sample

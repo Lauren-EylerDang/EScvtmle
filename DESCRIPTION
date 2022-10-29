@@ -17,6 +17,7 @@ Depends:
 Imports: 
     origami (>= 1.0.5),
     dplyr (>= 1.0.8),
+    tidyselect (>= 1.2.0),
     MASS (>= 7.3.54),
     stringr (>= 1.4.0),
     ggplot2 (>= 3.3.6),

@@ -1,9 +1,9 @@
 #' @importFrom SuperLearner SuperLearner
 #' @importFrom stats predict
-#Function for training Super Learner estimators for outcome regressions and treatment mechanisms and calculating clever covariates for TMLE estimation of bias terms
-selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL){
+#Function for training initial estimators for the outcome, treatment mechanism, and study selection mechanism regressions for RCT with or without real-world data (when no active treatment is available in real-world data)
+selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, bounds){
 
-  #Estimate bias
+  #Train regressions for different experiments
   if(any(train_s$S==0)){
 
     Y <- train_s$Y
@@ -18,7 +18,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     }
 
 
-    # set the A=0 in X0
+    # set A=0 in X0 and A=1 in X1
     X0 <- X1 <- X
     X0$A <- 0
     X1$A <- 1
@@ -51,12 +51,12 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     # initial estimates of the outcome, given the observed exposure & covariates
     if(Q.discreteSL==TRUE){
       QbarAW <- predict(QbarSL, newdata=X)
-      # estimates of the outcome, given A=0 and covariates
+      # estimates of the outcome, given A=0 or A=1 and covariates
       Qbar0W<- predict(QbarSL, newdata=X0)
       Qbar1W<- predict(QbarSL, newdata=X1)
     } else {
       QbarAW <- predict(QbarSL, newdata=X)$pred
-      # estimates of the outcome, given A=0 and covariates
+      # estimates of the outcome, given A=0 or A=1 and covariates
       Qbar0W<- predict(QbarSL, newdata=X0)$pred
       Qbar1W<- predict(QbarSL, newdata=X1)$pred
     }
@@ -96,24 +96,24 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     #-------------------------------------------------
 
     if(target.gwt){
-      wt <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s)) + 1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s))
+      wt <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s), bounds) + 1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s), bounds)
       H.AW1 <- as.numeric(X$A==1 & X$Delta==1)
       H.AW0 <- -1*(as.numeric(X$A==0 & X$Delta==1))
       H.AW <- (as.numeric(X$A==1 & X$Delta==1))-1*(as.numeric(X$A==0 & X$Delta==1))
 
-      # also want to evaluate the clever covariates at A=0 for all subjects
+      # also want to evaluate the clever covariates at A=0 or A=1 for all subjects
       H.0W<- rep(-1, nrow(X))
       H.1W<- rep(1, nrow(X))
     } else{
       wt <- rep(1, nrow(X))
-      H.AW1 <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s))
-      H.AW0 <- -1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s))
+      H.AW1 <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s), bounds)
+      H.AW0 <- -1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s), bounds)
 
-      H.AW <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s))-1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s))
+      H.AW <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s), bounds)-1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s), bounds)
 
-      # also want to evaluate the clever covariates at A=0 for all subjects
-      H.0W<- -1/.bound((gHat0W*dHat1W$A0),nrow(train_s))
-      H.1W<- 1/.bound((gHat1W*dHat1W$A1),nrow(train_s))
+      # also want to evaluate the clever covariates at A=0 or A=1 for all subjects
+      H.0W<- -1/.bound((gHat0W*dHat1W$A0),nrow(train_s), bounds)
+      H.1W<- 1/.bound((gHat1W*dHat1W$A1),nrow(train_s), bounds)
     }
 
     #TMLE for E[E[Y|W,A=0,S=1]]
@@ -156,7 +156,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     # initial estimates of the outcome, given the observed exposure & covariates
     if(Q.discreteSL==TRUE){
       QbarSAW <- predict(QbarSL_S, newdata=XS)
-      # estimates of the outcome, given A=0 and covariates
+      # estimates of the outcome, given A=0, S=1, and covariates
       QbarS0W<- predict(QbarSL_S, newdata=XS0)
     } else {
       QbarSAW <- predict(QbarSL_S, newdata=XS)$pred
@@ -167,14 +167,12 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     # Estimate the trial participation mechanism g(S|A=0,Delta=1,W)
     #------------------------------------------
     lambda_A0 <- XS[which(XS$A==0 & XS$Delta==1),]
-    # call Super Learner for the exposure mechanism
     gSHatSL<- SuperLearner(Y=lambda_A0$S, X=lambda_A0[ , -which(colnames(lambda_A0) %in% c("A","S","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
     if(g.discreteSL==TRUE){
       keepAlg <- which.min(gSHatSL$cvRisk)
       gSHatSL <- gSHatSL$fitLibrary[[keepAlg]]
       gSHat1W <- predict(gSHatSL, newdata = XS)
     } else {
-      # generate predicted prob being exposed, given baseline covariates
       gSHat1W <- predict(gSHatSL, newdata = XS)$pred
     }
 
@@ -183,17 +181,17 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     # Clever covariate H(S,A,W) for each subject
     #-------------------------------------------------
     if(target.gwt){
-      wt_s <- as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHat0W*dHat1W$A0),nrow(train_s))
+      wt_s <- as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHat0W*dHat1W$A0),nrow(train_s), bounds)
       H.SAW<- as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)
 
       # also want to evaluate the clever covariates at S=1 and A=0 for all subjects
       H.S0W<- rep(1, nrow(XS))
     } else{
       wt_s <- rep(1, nrow(XS))
-      H.SAW<- as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHat0W*dHat1W$A0),nrow(train_s))
+      H.SAW<- as.numeric(XS$A==0 & XS$S==1 & XS$Delta == 1)/.bound((gSHat1W*gHat0W*dHat1W$A0),nrow(train_s), bounds)
 
       # also want to evaluate the clever covariates at S=1 and A=0 for all subjects
-      H.S0W<- 1/.bound((gSHat1W*gHat0W*dHat1W$A0),nrow(train_s))
+      H.S0W<- 1/.bound((gSHat1W*gHat0W*dHat1W$A0),nrow(train_s), bounds)
     }
 
     if(is.null(NCO)==FALSE){
@@ -277,7 +275,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       # Clever covariate H(A,W) for each subject
       #-------------------------------------------------
       if(target.gwt){
-        wt_nco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s)) + 1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s))
+        wt_nco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s), bounds) + 1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s), bounds)
         H.AW1nco <- as.numeric(X$A==1 & X$NCO_delta==1)
         H.AW0nco <- -1*(as.numeric(X$A==0 & X$NCO_delta==1))
         H.AWnco <- (as.numeric(X$A==1 & X$NCO_delta==1))-1*(as.numeric(X$A==0 & X$NCO_delta==1))
@@ -287,14 +285,14 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
         H.1Wnco<- rep(1, nrow(X))
       } else{
         wt_nco <- rep(1, nrow(X))
-        H.AW1nco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s))
-        H.AW0nco <- -1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s))
+        H.AW1nco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s), bounds)
+        H.AW0nco <- -1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s), bounds)
 
-        H.AWnco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s))-1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s))
+        H.AWnco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s), bounds)-1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s), bounds)
 
         # also want to evaluate the clever covariates at A=0 for all subjects
-        H.0Wnco<- -1/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s))
-        H.1Wnco<- 1/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s))
+        H.0Wnco<- -1/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s), bounds)
+        H.1Wnco<- 1/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s), bounds)
       }
 
     } else {
@@ -322,7 +320,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     }
 
 
-    # set the A=0 in X0
+    # set A=0 in X0 and A=1 in X1
     X0 <- X1 <- X
     X0$A <- 0
     X1$A <- 1
@@ -354,13 +352,13 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
     if(Q.discreteSL==TRUE){
       # initial estimates of the outcome, given the observed exposure & covariates
       QbarAW <- predict(QbarSL, newdata=X)
-      # estimates of the outcome, given A=0 and covariates
+      # estimates of the outcome, given A=0 or A=1 and covariates
       Qbar0W<- predict(QbarSL, newdata=X0)
       Qbar1W<- predict(QbarSL, newdata=X1)
     } else {
       # initial estimates of the outcome, given the observed exposure & covariates
       QbarAW <- predict(QbarSL, newdata=X)$pred
-      # estimates of the outcome, given A=0 and covariates
+      # estimates of the outcome, given A=0 or A=1 and covariates
       Qbar0W<- predict(QbarSL, newdata=X0)$pred
       Qbar1W<- predict(QbarSL, newdata=X1)$pred
     }
@@ -382,17 +380,16 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       DbarSL <- NULL
     }
 
-    # Estimate the exposure mechanism g(A|W)
+    # Known randomization probability for RCT
     gHatSL<- NULL
     gHat1W<- rep(pRCT, nrow(X))
-    # predicted prob of not being exposed, given baseline covariates
     gHat0W<- 1- gHat1W
 
     #-------------------------------------------------
     # Clever covariate H(A,W) for each subject
     #-------------------------------------------------
     if(target.gwt){
-      wt <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s)) + 1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s))
+      wt <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s), bounds) + 1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s), bounds)
       H.AW1 <- as.numeric(X$A==1 & X$Delta==1)
       H.AW0 <- -1*(as.numeric(X$A==0 & X$Delta==1))
       H.AW <- (as.numeric(X$A==1 & X$Delta==1))-1*(as.numeric(X$A==0 & X$Delta==1))
@@ -402,14 +399,14 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       H.1W<- rep(1, nrow(X))
     } else{
       wt <- rep(1, nrow(X))
-      H.AW1 <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s))
-      H.AW0 <- -1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s))
+      H.AW1 <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s), bounds)
+      H.AW0 <- -1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s), bounds)
 
-      H.AW <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s))-1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s))
+      H.AW <- (as.numeric(X$A==1 & X$Delta==1))/.bound((gHat1W*dHat1W$A1),nrow(train_s), bounds)-1*(as.numeric(X$A==0 & X$Delta==1))/.bound((gHat0W*dHat1W$A0),nrow(train_s), bounds)
 
       # also want to evaluate the clever covariates at A=0 for all subjects
-      H.0W<- -1/.bound((gHat0W*dHat1W$A0),nrow(train_s))
-      H.1W<- 1/.bound((gHat1W*dHat1W$A1),nrow(train_s))
+      H.0W<- -1/.bound((gHat0W*dHat1W$A0),nrow(train_s), bounds)
+      H.1W<- 1/.bound((gHat1W*dHat1W$A1),nrow(train_s), bounds)
     }
 
     QbarSAW <- NULL
@@ -465,7 +462,6 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       }
 
       gHat1W<- rep(pRCT, nrow(X))
-      # predicted prob of not being exposed, given baseline covariates
       gHat0W<- 1- gHat1W
 
       dHat1Wnco <- list()
@@ -489,24 +485,24 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
       # Clever covariate H(A,W) for each subject
       #-------------------------------------------------
       if(target.gwt){
-        wt_nco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s)) + 1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s))
+        wt_nco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s), bounds) + 1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s), bounds)
         H.AW1nco <- as.numeric(X$A==1 & X$NCO_delta==1)
         H.AW0nco <- -1*(as.numeric(X$A==0 & X$NCO_delta==1))
         H.AWnco <- (as.numeric(X$A==1 & X$NCO_delta==1))-1*(as.numeric(X$A==0 & X$NCO_delta==1))
 
-        # also want to evaluate the clever covariates at A=0 for all subjects
+        # also want to evaluate the clever covariates at A=0 or A=1 for all subjects
         H.0Wnco<- rep(-1, nrow(X))
         H.1Wnco<- rep(1, nrow(X))
       } else{
         wt_nco <- rep(1, nrow(X))
-        H.AW1nco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s))
-        H.AW0nco <- -1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s))
+        H.AW1nco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s), bounds)
+        H.AW0nco <- -1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s), bounds)
 
-        H.AWnco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s))-1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s))
+        H.AWnco <- (as.numeric(X$A==1 & X$NCO_delta==1))/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s), bounds)-1*(as.numeric(X$A==0 & X$NCO_delta==1))/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s), bounds)
 
-        # also want to evaluate the clever covariates at A=0 for all subjects
-        H.0Wnco<- -1/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s))
-        H.1Wnco<- 1/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s))
+        # also want to evaluate the clever covariates at A=0 or A=1 for all subjects
+        H.0Wnco<- -1/.bound((gHat0W*dHat1Wnco$A0),nrow(train_s), bounds)
+        H.1Wnco<- 1/.bound((gHat1W*dHat1Wnco$A1),nrow(train_s), bounds)
       }
 
     } else {
@@ -531,7 +527,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 #' @importFrom stats glm
 #' @importFrom stats plogis
 #' @importFrom stats qlogis
-#estimate bias-variance tradeoff using experiment-selection set for each fold
+#Function to estimate the bias-variance tradeoff using the experiment-selection set for each fold when active treatment is not available in the real-world data
 bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation, family){
   out <- list()
 
@@ -589,9 +585,7 @@ bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuatio
     if(s==1){
       QbarS0W.star <- Qbar0W.star
     } else {
-      #------------------------------------------
       # Update the initial estimator
-      #------------------------------------------
       if(fluctuation == "logistic"){
         logitUpdate<- glm(selector[[v]][[s]]$Y[which(train_s$Delta==1)] ~ -1 + offset(qlogis(selector[[v]][[s]]$QbarSAW[which(train_s$Delta==1)])) +  selector[[v]][[s]]$H.SAW[which(train_s$Delta==1)], family='quasibinomial', weights = selector[[v]][[s]]$wt_s[which(train_s$Delta==1)])
 
@@ -607,9 +601,6 @@ bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuatio
         QbarSAW.star<- selector[[v]][[s]]$QbarSAW + epsilon*selector[[v]][[s]]$H.SAW
         QbarS0W.star<- selector[[v]][[s]]$QbarS0W + epsilon*selector[[v]][[s]]$H.S0W
       }
-      #------------------------------------------
-      # Estimate Psi(P_0)
-      #------------------------------------------
 
       if(family=="gaussian" & fluctuation == "logistic"){
         QbarSAW.star <- QbarSAW.star*(max(data$Y, na.rm = TRUE) - min(data$Y, na.rm = TRUE)) + min(data$Y, na.rm = TRUE)
