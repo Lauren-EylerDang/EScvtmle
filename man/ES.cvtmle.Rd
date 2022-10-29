@@ -28,7 +28,8 @@ ES.cvtmle(
   fluctuation = "logistic",
   comparisons = list(c(1), c(1, 2)),
   adjustnco = FALSE,
-  target.gwt = TRUE
+  target.gwt = TRUE,
+  bounds = NULL
 )
 }
 \arguments{
@@ -44,11 +45,11 @@ ES.cvtmle(
 
 \item{treatment}{Value of treatment variable that corresponds to the active treatment (e.g. "DrugName" or 1). All other values of the treatment variable are assumed to be control.}
 
-\item{outcome}{Character name of outcome variable (e.g. "Y"). If the outcome is a binary variable subject to censoring, it should be coded as 0 for observations that were censored.}
+\item{outcome}{Character name of outcome variable (e.g. "Y"). If the outcome is a binary variable subject to censoring, censored observations should either be coded as NA or should be coded as 0 and a missingness indicator should be included (see parameter Delta below).}
 
-\item{NCO}{Character name of negative control outcome variable (e.g. "nco") or NULL if no NCO available. If NCO is a binary variable subject to censoring, it should be coded as 0 for observations that were censored.}
+\item{NCO}{Character name of negative control outcome variable (e.g. "nco") or NULL if no NCO available. If the NCO is a binary variable subject to censoring, censored observations should either be coded as NA or should be coded as 0 and a missingness indicator should be included (see parameter Delta_NCO below).}
 
-\item{Delta}{Character name of a variable that is 0 if an observation was censored (missing binary outcome) and 1 otherwise. Missing outcomes may also be coded as NA, in which case a Delta variable will be added internally. If no missing outcomes, set Delta=NULL.}
+\item{Delta}{Character name of a variable that is 0 if an observation was censored (missing outcome) and 1 otherwise. Missing outcomes may also be coded as NA, in which case a Delta variable will be added internally. If no missing outcomes, set Delta=NULL.}
 
 \item{Delta_NCO}{Character name of a variable that is 0 if the value of NCO is missing and 1 otherwise. Missing NCOs may also be coded as NA, in which case a Delta_NCO variable will be added internally. If no missing NCO or no NCO, set Delta_NCO=NULL.}
 
@@ -74,11 +75,13 @@ ES.cvtmle(
 
 \item{fluctuation}{'logistic' (default for binary and continuous outcomes), or 'linear' describing fluctuation for targeted maximum likelihood estimation (TMLE) updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.}
 
-\item{comparisons}{A list of the values of the study variable that you would like to compare. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD.}
+\item{comparisons}{A list of the values of the study variable that you would like to compare. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD. The first element of comparisons must be c(1) for the RCT only.}
 
 \item{adjustnco}{Should we adjust for the NCO as a proxy of bias in the estimation of the ATE of A on Y? (TRUE/FALSE). Default is FALSE.}
 
 \item{target.gwt}{As in the tmle R package (Gruber & van der Laan, 2012), if target.gwt is TRUE, the treatment mechanism is moved from the denominator of the clever covariate to the weight when fitting the coefficient for TMLE updating. Default TRUE.}
+
+\item{bounds}{Optional bounds for truncation of the denominator of the clever covariate. The default is c(5/sqrt(n)/log(n),1).}
 }
 \value{
 Returns an object of class "EScvtmle" that is a list with the following components.
@@ -97,8 +100,9 @@ Returns an object of class "EScvtmle" that is a list with the following componen
 This function runs the experiment-selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) (Dang et al. 2022) for selecting and analyzing an optimal experiment, where candidate experiments include a randomized controlled trial (RCT) with or without various real-world datasets (RWD).
 }
 \details{
-The experiment selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) aims to select the experiment that optimizes the bias-variance tradeoff for estimating a causal average treatment effect where different experiments may include an RCT alone or an RCT combined with real-world data.
+The experiment selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) aims to select the experiment that optimizes the bias-variance tradeoff for estimating a causal average treatment effect where different experiments may include a randomized controlled trial (RCT) alone or an RCT combined with real-world data.
 Using cross-validation, the ES-CVTMLE separates the selection of the optimal experiment from the estimation of the ATE for the chosen experiment.
+In order to avoid positivity violations, the package internally trims RWD so that no baseline covariate values are not represented in the RCT if active treatment is not available in the RWD.
 The estimated bias term in the selector is a function of the difference in conditional mean outcome under control for the RCT compared to the combined experiment.
 In order to help include truly unbiased external data in the analysis, the estimated average treatment effect on a negative control outcome may be added to the bias term in the selector by setting the parameter NCO to the character name of a negative control variable in the dataset.
 For more details about this method, please see Dang et al. (2022).
@@ -120,10 +124,11 @@ results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           treatment_var="treatment", treatment=1,
                           outcome="laz", NCO="Nlt18scale",
                           Delta=NULL, Delta_NCO=NULL,
-                          pRCT=0.5, V=10, Q.SL.library=c("SL.glm"),
+                          pRCT=0.5, V=5, Q.SL.library=c("SL.glm"),
                           g.SL.library=c("SL.glm"), Q.discreteSL=TRUE, g.discreteSL=TRUE,
                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                           comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
 print.EScvtmle(results_rwd1)
 }
+
 }

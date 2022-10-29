@@ -13,7 +13,7 @@ An object of class "data.frame"
  \item{aged}{Child's age in days.}
  \item{sex}{Child's sex.}
  \item{momedu}{Mother's education level.}
- \item{hfiacat}{Category of household food insecurity. Levels are "Food Secure", "Mildly Food Insecure", "Moderately Food Insecure", and "Severely Food Insecure".}
+ \item{hfiacat}{Category of household food insecurity. Levels are "Food Secure", "Mildly Food Insecure", "Moderately to Severely Food Insecure".}
  \item{Nlt18scale}{Scaled number of household members <= 18 years old.}
 }
 }
@@ -33,7 +33,7 @@ To demonstrate how conducting a small RCT combined with unbiased or biased obser
 Study 1: A random sample of 150 "Sanitation" arm observations and 150 "Control" arm observations with complete information was taken from the overall RCT, with "study" variable set to 1.
 Study 2: A second random sample of 150 "Sanitation" arm observations and 150 "Control" arm observations with complete information was taken from the remaining RCT observations, with "study" variable set to 2 to mimic an unbiased external dataset.
 Study 3: From the "Control" arm observations not included in the study=1 sample, 150 observations who had improved latrines at baseline and 150 observations who did not have improved latrines at baseline were sampled, with "study" variable set to 3 to mimic a biased external dataset.
-The data contained in this file consists of all three "studies".
+The data contained in this file consist of all three "studies".
 Because this study was not set up to have a negative control outcome for length-for-age Z-score, the options were limited.
 We would like a variable that is associated with socioeconomic status (SES) because that is a likely cause of the unmeasured confounding highlighted by Arnold et al. (2018).
 We chose number of household members <=18 years old as an NCO, because prior studies have shown this variable to be associated with SES in Bangladesh (The World Bank, 2013),
@@ -52,7 +52,7 @@ results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           treatment_var="treatment", treatment=1,
                           outcome="laz", NCO="Nlt18scale",
                           Delta=NULL, Delta_NCO=NULL,
-                          pRCT=0.5, V=10, Q.SL.library=c("SL.glm"),
+                          pRCT=0.5, V=5, Q.SL.library=c("SL.glm"),
                           g.SL.library=c("SL.glm"), Q.discreteSL=TRUE, g.discreteSL=TRUE,
                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
                           comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)

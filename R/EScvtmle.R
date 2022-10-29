@@ -8,9 +8,9 @@
 #' @param covariates Vector of character names of covariates to be adjusted for (e.g. c("W1", "W2"))
 #' @param treatment_var Character name of treatment variable (e.g. "A")
 #' @param treatment Value of treatment variable that corresponds to the active treatment (e.g. "DrugName" or 1). All other values of the treatment variable are assumed to be control.
-#' @param outcome Character name of outcome variable (e.g. "Y"). If the outcome is a binary variable subject to censoring, it should be coded as 0 for observations that were censored.
-#' @param NCO Character name of negative control outcome variable (e.g. "nco") or NULL if no NCO available. If NCO is a binary variable subject to censoring, it should be coded as 0 for observations that were censored.
-#' @param Delta Character name of a variable that is 0 if an observation was censored (missing binary outcome) and 1 otherwise. Missing outcomes may also be coded as NA, in which case a Delta variable will be added internally. If no missing outcomes, set Delta=NULL.
+#' @param outcome Character name of outcome variable (e.g. "Y"). If the outcome is a binary variable subject to censoring, censored observations should either be coded as NA or should be coded as 0 and a missingness indicator should be included (see parameter Delta below).
+#' @param NCO Character name of negative control outcome variable (e.g. "nco") or NULL if no NCO available. If the NCO is a binary variable subject to censoring, censored observations should either be coded as NA or should be coded as 0 and a missingness indicator should be included (see parameter Delta_NCO below).
+#' @param Delta Character name of a variable that is 0 if an observation was censored (missing outcome) and 1 otherwise. Missing outcomes may also be coded as NA, in which case a Delta variable will be added internally. If no missing outcomes, set Delta=NULL.
 #' @param Delta_NCO Character name of a variable that is 0 if the value of NCO is missing and 1 otherwise. Missing NCOs may also be coded as NA, in which case a Delta_NCO variable will be added internally. If no missing NCO or no NCO, set Delta_NCO=NULL.
 #' @param pRCT The probability of randomization to treatment in the RCT
 #' @param V Number of cross-validation folds (default 10)
@@ -23,9 +23,10 @@
 #' @param family Either "binomial" for binary outcomes or "gaussian" for continuous outcomes
 #' @param family_nco Family for negative control outcome
 #' @param fluctuation 'logistic' (default for binary and continuous outcomes), or 'linear' describing fluctuation for targeted maximum likelihood estimation (TMLE) updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.
-#' @param comparisons A list of the values of the study variable that you would like to compare. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD.
+#' @param comparisons A list of the values of the study variable that you would like to compare. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD. The first element of comparisons must be c(1) for the RCT only.
 #' @param adjustnco Should we adjust for the NCO as a proxy of bias in the estimation of the ATE of A on Y? (TRUE/FALSE). Default is FALSE.
 #' @param target.gwt As in the tmle R package (Gruber & van der Laan, 2012), if target.gwt is TRUE, the treatment mechanism is moved from the denominator of the clever covariate to the weight when fitting the coefficient for TMLE updating. Default TRUE.
+#' @param bounds Optional bounds for truncation of the denominator of the clever covariate. The default is c(5/sqrt(n)/log(n),1).
 #'
 #' @importFrom origami make_folds
 #' @importFrom origami folds_vfold
@@ -49,8 +50,9 @@
 #'  \item{proportionselected}{Proportion of all cross-validation folds in which real-world (external) data were included in the analysis for the ES-CVTMLE estimator using the estimated bias squared plus variance selector ("b2v") and for the selector that includes an estimate of the ATE on a negative control outcome (NCO) in the bias term of the selector ("ncobias") if an NCO is available.}
 #' }
 #'
-#' @details The experiment selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) aims to select the experiment that optimizes the bias-variance tradeoff for estimating a causal average treatment effect where different experiments may include an RCT alone or an RCT combined with real-world data.
+#' @details The experiment selector cross-validated targeted maximum likelihood estimator (ES-CVTMLE) aims to select the experiment that optimizes the bias-variance tradeoff for estimating a causal average treatment effect where different experiments may include a randomized controlled trial (RCT) alone or an RCT combined with real-world data.
 #' Using cross-validation, the ES-CVTMLE separates the selection of the optimal experiment from the estimation of the ATE for the chosen experiment.
+#' In order to avoid positivity violations, the package internally trims RWD so that no baseline covariate values are not represented in the RCT if active treatment is not available in the RWD.
 #' The estimated bias term in the selector is a function of the difference in conditional mean outcome under control for the RCT compared to the combined experiment.
 #' In order to help include truly unbiased external data in the analysis, the estimated average treatment effect on a negative control outcome may be added to the bias term in the selector by setting the parameter NCO to the character name of a negative control variable in the dataset.
 #' For more details about this method, please see Dang et al. (2022).
@@ -72,15 +74,16 @@
 #'                           treatment_var="treatment", treatment=1,
 #'                           outcome="laz", NCO="Nlt18scale",
 #'                           Delta=NULL, Delta_NCO=NULL,
-#'                           pRCT=0.5, V=10, Q.SL.library=c("SL.glm"),
+#'                           pRCT=0.5, V=5, Q.SL.library=c("SL.glm"),
 #'                           g.SL.library=c("SL.glm"), Q.discreteSL=TRUE, g.discreteSL=TRUE,
 #'                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
 #'                           comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
 #' print.EScvtmle(results_rwd1)
 #' }
+#'
 #' @export
 
-ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE){
+ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL){
 
   if (length(comparisons)>2) stop("Package currently compares two experiments. Check back for updates to compare multiple experiments.")
 
@@ -95,7 +98,7 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
     Delta_NCO = "NCO_delta"
   }
 
-  #Create cross-validation folds that preserve proportion of RCT (if txinwrd=TRUE) or of RCT controls (if txinrwd=FALSE) in validation sets
+  #Create cross-validation folds that preserve proportion of RCT (if txinwrd=TRUE) or of RCT controls (if txinrwd=FALSE) as well as proportion of outcomes in validation sets
   ids <- data$S
 
   if(txinrwd==TRUE){
@@ -151,7 +154,7 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
     #define training set
     train <- data[sort(folds[[v]]$training_set),]
 
-    selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons)
+    selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons, bounds)
 
     if(txinrwd==TRUE){
       bvt[[v]] <- bvt_txinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
@@ -187,11 +190,11 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   results$foldATEs$ncobias <- vector()
 
   #estimate components of limit distribution
-  limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons)
+  limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons, bounds)
 
   results$g <- list()
   for(s in 1:length(comparisons)){
-    results$g[[s]] <- as.vector(1/(limitdist$clevercov[[s]]))
+    results$g[[s]] <- as.vector(1/(abs(limitdist$clevercov[[s]])))
   }
 
 
