@@ -7,6 +7,7 @@ For a CRAN submission we recommend that you fix all NOTEs, WARNINGs and ERRORs.
 ## R CMD check results
 ❯ On windows-x86_64-devel (r-devel)
   checking CRAN incoming feasibility ... [14s] NOTE
+  Maintainer: 'Lauren Eyler Dang <lauren.eyler@berkeley.edu>'
   
   New submission
   
@@ -16,9 +17,8 @@ For a CRAN submission we recommend that you fix all NOTEs, WARNINGs and ERRORs.
     TMLE (3:31)
     al (11:905)
     et (11:902)
-  Maintainer: 'Lauren Eyler Dang <lauren.eyler@berkeley.edu>'
-  
-Notes: This is a new submission. The possibly misspelled words are abbreviations that have been defined.
+    
+Note: This is a new submission. The possibly misspelled words are either common (e.g. et al. ) or previously defined abbreviations.
 
 ❯ On windows-x86_64-devel (r-devel)
   checking for detritus in the temp directory ... NOTE
@@ -37,11 +37,11 @@ Notes: This is a new submission. The possibly misspelled words are abbreviations
     et (11:902)
     RCT (4:9, 11:302, 11:319, 11:622)
     TMLE (3:31)
-
-Notes: This is a new submission. The possibly misspelled words are abbreviations that have been defined.
+    
+Note: This is a new submission. The possibly misspelled words are either common (e.g. et al. ) or previously defined abbreviations.
 
 ❯ On fedora-clang-devel (r-devel)
-  checking CRAN incoming feasibility ... [6s/28s] NOTE
+  checking CRAN incoming feasibility ... [6s/25s] NOTE
   Maintainer: ‘Lauren Eyler Dang <lauren.eyler@berkeley.edu>’
   
   New submission
@@ -53,7 +53,7 @@ Notes: This is a new submission. The possibly misspelled words are abbreviations
     al (11:905)
     et (11:902)
     
-Notes: This is a new submission. The possibly misspelled words are abbreviations that have been defined.
+Note: This is a new submission. The possibly misspelled words are either common (e.g. et al. ) or previously defined abbreviations.
 
 ❯ On fedora-clang-devel (r-devel)
   checking HTML version of manual ... NOTE
