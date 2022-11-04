@@ -1,7 +1,7 @@
 #' @importFrom SuperLearner SuperLearner
 #' @importFrom stats predict
 #Function for training initial estimators for the outcome, treatment mechanism, and study selection mechanism regressions for RCT with or without real-world data (when no active treatment is available in real-world data)
-selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.SL.library, pRCT = pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, bounds){
+selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT = pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, bounds){
 
   #Train regressions for different experiments
   if(any(train_s$S==0)){
@@ -63,7 +63,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -256,7 +256,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]
@@ -365,7 +365,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -466,7 +466,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library, g.S
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library, family="binomial", control = list(saveFitLibrary=TRUE))
+        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]

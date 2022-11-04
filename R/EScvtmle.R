@@ -15,7 +15,8 @@
 #' @param pRCT The probability of randomization to treatment in the RCT
 #' @param V Number of cross-validation folds (default 10)
 #' @param Q.SL.library Candidate algorithms for SuperLearner estimation of outcome regressions
-#' @param d.SL.library Candidate algorithms for SuperLearner estimation of missingness mechanism
+#' @param d.SL.library.RCT Candidate algorithms for SuperLearner estimation of missingness mechanism for RCT-only
+#' @param d.SL.library.RWD Candidate algorithms for SuperLearner estimation of missingness mechanism for RCT+RWD
 #' @param g.SL.library Candidate algorithms for SuperLearner estimation of treatment mechanism for combined RCT/RWD analysis
 #' @param Q.discreteSL Should a discrete SuperLearner be used for estimation of outcome regressions? (TRUE/FALSE)
 #' @param d.discreteSL Should a discrete SuperLearner be used for estimation of missingness mechanism? (TRUE/FALSE)
@@ -83,7 +84,7 @@
 #'
 #' @export
 
-ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL){
+ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL){
 
   if (length(comparisons)>2) stop("Package currently compares two experiments. Check back for updates to compare multiple experiments.")
 
@@ -154,7 +155,7 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
     #define training set
     train <- data[sort(folds[[v]]$training_set),]
 
-    selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons, bounds)
+    selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons, bounds)
 
     if(txinrwd==TRUE){
       bvt[[v]] <- bvt_txinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
