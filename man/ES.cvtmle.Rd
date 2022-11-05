@@ -31,7 +31,8 @@ ES.cvtmle(
   adjustnco = FALSE,
   target.gwt = TRUE,
   bounds = NULL,
-  cvControl = list()
+  cvControl = list(),
+  MCsamp
 )
 }
 \arguments{
@@ -88,6 +89,8 @@ ES.cvtmle(
 \item{bounds}{Optional bounds for truncation of the denominator of the clever covariate. The default is c(5/sqrt(n)/log(n),1).}
 
 \item{cvControl}{A list of parameters to control the cross-validation process for the SuperLearners. See ?SuperLearner for more details.}
+
+\item{MCsamp}{Number of Monte Carlo samples from the estimated limit distribution to use to estimate quantile-based confidence intervals. Default 1000.}
 }
 \value{
 Returns an object of class "EScvtmle" that is a list with the following components.
