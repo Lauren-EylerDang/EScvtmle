@@ -255,7 +255,7 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
 
 #function for sampling from the estimated limit distribution
 
-limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons){
+limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons, MCsamp){
   out <- list()
   psipoundvec <- NA
   for(v in 1:V){
@@ -275,7 +275,7 @@ limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist
     EICmat_poundplusphi <- cbind(EICpoundplusphi, limitdist$EICay)
     out$covMat_poundplusphi <- (t(EICmat_poundplusphi)%*%EICmat_poundplusphi)/nrow(data)
 
-    ztilde_poundplusphi_samp <- mvrnorm(n = 1000, mu=rep(0,ncol(EICmat_poundplusphi)), Sigma=out$covMat_poundplusphi/nrow(data))
+    ztilde_poundplusphi_samp <- mvrnorm(n = MCsamp, mu=rep(0,ncol(EICmat_poundplusphi)), Sigma=out$covMat_poundplusphi/nrow(data))
   }
 
   #overall covariance matrix for ztilde
@@ -284,7 +284,7 @@ limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist
   out$covMat <- (t(EICmat)%*%EICmat)/nrow(data)
 
   #sample from multivariate ztilde
-  ztilde_samp <- mvrnorm(n = 1000, mu=rep(0,ncol(EICmat)), Sigma=out$covMat/nrow(data))
+  ztilde_samp <- mvrnorm(n = MCsamp, mu=rep(0,ncol(EICmat)), Sigma=out$covMat/nrow(data))
 
   #selector for each sample
   biassample_psipound <- ztilde_samp[,(1:as.numeric(length(comparisons)*V))]

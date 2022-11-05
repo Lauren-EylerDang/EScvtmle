@@ -29,6 +29,7 @@
 #' @param target.gwt As in the tmle R package (Gruber & van der Laan, 2012), if target.gwt is TRUE, the treatment mechanism is moved from the denominator of the clever covariate to the weight when fitting the coefficient for TMLE updating. Default TRUE.
 #' @param bounds Optional bounds for truncation of the denominator of the clever covariate. The default is c(5/sqrt(n)/log(n),1).
 #' @param cvControl A list of parameters to control the cross-validation process for the SuperLearners. See ?SuperLearner for more details.
+#' @param MCsamp Number of Monte Carlo samples from the estimated limit distribution to use to estimate quantile-based confidence intervals. Default 1000.
 #'
 #' @importFrom origami make_folds
 #' @importFrom origami folds_vfold
@@ -85,7 +86,7 @@
 #'
 #' @export
 
-ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL, cvControl = list()){
+ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL, cvControl = list(), MCsamp){
 
   if (length(comparisons)>2) stop("Package currently compares two experiments. Check back for updates to compare multiple experiments.")
 
@@ -219,7 +220,7 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   }
 
   #sample from limit distribution
-  limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons)
+  limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons, MCsamp)
 
   results$CI$b2v <- list()
   results$CI$ncobias <- list()
