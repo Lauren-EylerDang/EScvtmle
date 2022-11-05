@@ -292,11 +292,11 @@ limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist
     biassample_psipoundplusphi <- ztilde_poundplusphi_samp[,(1:as.numeric(length(comparisons)*V))]
   }
 
-  lambdatildeb2v <- matrix(NA, nrow=1000, ncol=length(psipoundvec))
+  lambdatildeb2v <- matrix(NA, nrow=MCsamp, ncol=length(psipoundvec))
   if(is.null(NCO)==FALSE){
-    lambdatildencobias <- matrix(NA, nrow=1000, ncol=length(psipoundplusphivec))
+    lambdatildencobias <- matrix(NA, nrow=MCsamp, ncol=length(psipoundplusphivec))
   }
-  for(b in 1:1000){
+  for(b in 1:MCsamp){
     lambdatildeb2v[b,] <- (biassample_psipound[b,]+psipoundvec)^2 + var_ay
     if(is.null(NCO)==FALSE){
       lambdatildencobias[b,] <- (biassample_psipoundplusphi[b,] + psipoundplusphivec)^2 + var_ay
@@ -310,19 +310,19 @@ limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist
 
   #arrange V samples from limit distribution for psi_star for each sample
   sample_psi_pstarnv<- list()
-  for(b in 1:1000){
+  for(b in 1:MCsamp){
     sample_psi_pstarnv[[b]] <- matrix(0, nrow=V, ncol=length(comparisons))
     for(v in 1:V){
       sample_psi_pstarnv[[b]][v,] <- psisamp[b,((length(comparisons)*(v-1)+1):(length(comparisons)*(v)))]
     }
   }
 
-  #now take average over whichever selected in the bias samples for each of 1000 samples
+  #now take average over whichever selected in the bias samples for each of MCsamp samples
   out$psi_pstarnv_b2v <- vector()
   psi_pstarnv_b2v_v <- list()
   out$psi_pstarnv_nco <- vector()
   psi_pstarnv_nco_v <- list()
-  for(b in 1:1000){
+  for(b in 1:MCsamp){
     psi_pstarnv_b2v_v[[b]] <- vector()
     psi_pstarnv_nco_v[[b]] <- vector()
     for(v in 1:V){
