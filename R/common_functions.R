@@ -90,7 +90,7 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
 
 
 #apply selector_func to different datasets
-apply_selector_func <- function(txinrwd, train, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons, bounds){
+apply_selector_func <- function(txinrwd, train, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons, bounds, cvControl){
   out <- list()
   for(s in 1:(length(comparisons))){
 
@@ -98,9 +98,9 @@ apply_selector_func <- function(txinrwd, train, data, Q.SL.library, d.SL.library
     train_s$S[which(train_s$S!=1)]<-0
 
     if(txinrwd==TRUE){
-      out[[s]] <- selector_func_txrwd(train_s, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, bounds)
+      out[[s]] <- selector_func_txrwd(train_s, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, bounds, cvControl)
     } else {
-      out[[s]] <- selector_func_notxrwd(train_s, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, bounds)
+      out[[s]] <- selector_func_notxrwd(train_s, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, bounds, cvControl)
     }
   }
   return(out)

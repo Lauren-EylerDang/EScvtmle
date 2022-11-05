@@ -18,7 +18,8 @@ ES.cvtmle(
   pRCT,
   V = 10,
   Q.SL.library,
-  d.SL.library,
+  d.SL.library.RCT,
+  d.SL.library.RWD,
   g.SL.library,
   Q.discreteSL,
   d.discreteSL,
@@ -29,7 +30,8 @@ ES.cvtmle(
   comparisons = list(c(1), c(1, 2)),
   adjustnco = FALSE,
   target.gwt = TRUE,
-  bounds = NULL
+  bounds = NULL,
+  cvControl = list()
 )
 }
 \arguments{
@@ -59,7 +61,9 @@ ES.cvtmle(
 
 \item{Q.SL.library}{Candidate algorithms for SuperLearner estimation of outcome regressions}
 
-\item{d.SL.library}{Candidate algorithms for SuperLearner estimation of missingness mechanism}
+\item{d.SL.library.RCT}{Candidate algorithms for SuperLearner estimation of missingness mechanism for RCT-only}
+
+\item{d.SL.library.RWD}{Candidate algorithms for SuperLearner estimation of missingness mechanism for RCT+RWD}
 
 \item{g.SL.library}{Candidate algorithms for SuperLearner estimation of treatment mechanism for combined RCT/RWD analysis}
 
@@ -82,6 +86,8 @@ ES.cvtmle(
 \item{target.gwt}{As in the tmle R package (Gruber & van der Laan, 2012), if target.gwt is TRUE, the treatment mechanism is moved from the denominator of the clever covariate to the weight when fitting the coefficient for TMLE updating. Default TRUE.}
 
 \item{bounds}{Optional bounds for truncation of the denominator of the clever covariate. The default is c(5/sqrt(n)/log(n),1).}
+
+\item{cvControl}{A list of parameters to control the cross-validation process for the SuperLearners. See ?SuperLearner for more details.}
 }
 \value{
 Returns an object of class "EScvtmle" that is a list with the following components.
