@@ -86,7 +86,7 @@
 #'
 #' @export
 
-ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL, cvControl = list(), MCsamp){
+ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL, cvControl = list(), MCsamp=1000){
 
   if (length(comparisons)>2) stop("Package currently compares two experiments. Check back for updates to compare multiple experiments.")
 
