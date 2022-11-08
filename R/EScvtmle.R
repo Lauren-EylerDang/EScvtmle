@@ -24,7 +24,7 @@
 #' @param family Either "binomial" for binary outcomes or "gaussian" for continuous outcomes
 #' @param family_nco Family for negative control outcome
 #' @param fluctuation 'logistic' (default for binary and continuous outcomes), or 'linear' describing fluctuation for targeted maximum likelihood estimation (TMLE) updating. If 'logistic' with a continuous outcome, outcomes are scaled to (0,1) for TMLE targeting and then returned to the original scale for parameter estimation.
-#' @param comparisons A list of the values of the study variable that you would like to compare. For example, if you have an RCT labeled S=1 and RWD labeled S=2, you would use comparisons = list(c(1),c(1,2)) to compare RCT only to RCT + RWD. The first element of comparisons must be c(1) for the RCT only.
+#' @param comparisons A list of the values of the study variable that you would like to compare. For example, if you have an RCT labeled S=1 and RWD labeled S=0, you would use comparisons = list(c(1),c(1,0)) to compare RCT only to RCT + RWD. The first element of comparisons must be c(1) for the RCT only.
 #' @param adjustnco Should we adjust for the NCO as a proxy of bias in the estimation of the ATE of A on Y? (TRUE/FALSE). Default is FALSE.
 #' @param target.gwt As in the tmle R package (Gruber & van der Laan, 2012), if target.gwt is TRUE, the treatment mechanism is moved from the denominator of the clever covariate to the weight when fitting the coefficient for TMLE updating. Default TRUE.
 #' @param bounds Optional bounds for truncation of the denominator of the clever covariate. The default is c(5/sqrt(n)/log(n),1).
@@ -70,6 +70,7 @@
 #' \donttest{data(wash)
 #' #For unbiased external controls, use:
 #' dat <- wash[which(wash$study %in% c(1,2)),]
+#' dat$study[which(dat$study==2)]<-0
 #' set.seed(2022)
 #' results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
 #'                           data=dat, study="study",
@@ -80,7 +81,7 @@
 #'                           pRCT=0.5, V=5, Q.SL.library=c("SL.glm"),
 #'                           g.SL.library=c("SL.glm"), Q.discreteSL=TRUE, g.discreteSL=TRUE,
 #'                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
-#'                           comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
+#'                           comparisons = list(c(1),c(1,0)), adjustnco = FALSE, target.gwt = TRUE)
 #' print.EScvtmle(results_rwd1)
 #' }
 #'
