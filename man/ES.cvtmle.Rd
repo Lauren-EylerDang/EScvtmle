@@ -32,7 +32,7 @@ ES.cvtmle(
   target.gwt = TRUE,
   bounds = NULL,
   cvControl = list(),
-  MCsamp
+  MCsamp = 1000
 )
 }
 \arguments{
