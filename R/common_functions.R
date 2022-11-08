@@ -149,7 +149,11 @@ validpreds <- function(data, folds, V, selector, pRCT, Delta, Q.discreteSL, d.di
         out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$gHat1W <- rep(pRCT, length(which(data$v==v & (data$S %in% comparisons[[s]]))))
       } else {
         if(length(comparisons)>1){
-          out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$gHat1W <- predict(selector[[v]][[s]]$gHatSL, newdata = data[which(data$v==v & (data$S %in% comparisons[[s]])),])
+          if(g.discreteSL==TRUE){
+            out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$gHat1W <- predict(selector[[v]][[s]]$gHatSL, newdata = data[which(data$v==v & (data$S %in% comparisons[[s]])),])
+          } else {
+            out[[s]][which(data$v==v & (data$S %in% comparisons[[s]])),]$gHat1W <- predict(selector[[v]][[s]]$gHatSL, newdata = data[which(data$v==v & (data$S %in% comparisons[[s]])),])$pred
+          }
         }
       }
     }
