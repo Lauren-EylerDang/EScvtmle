@@ -4,7 +4,7 @@
 #'
 #' @param txinrwd Whether active treatment is available in RWD (TRUE/FALSE). If FALSE, only the control arm of the RCT will be augmented with external data.
 #' @param data The dataset
-#' @param study Character name of variable indicating study participation (e.g. "S"). This variable should take a value of 1 for the RCT and should take other values for the other study(ies). Note that the code is currently set up only to handle two studies, but may be expanded to handle multiple studies in the future.
+#' @param study Character name of variable indicating study participation (e.g. "S"). This variable should take a value of 1 for the RCT and should take a value of 0 for the RWD. Note that the code is currently set up only to handle two studies, but may be expanded to handle multiple studies in the future.
 #' @param covariates Vector of character names of covariates to be adjusted for (e.g. c("W1", "W2"))
 #' @param treatment_var Character name of treatment variable (e.g. "A")
 #' @param treatment Value of treatment variable that corresponds to the active treatment (e.g. "DrugName" or 1). All other values of the treatment variable are assumed to be control.
@@ -86,9 +86,11 @@
 #'
 #' @export
 
-ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL, cvControl = list(), MCsamp=1000){
+ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,0)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL, cvControl = list(), MCsamp=1000){
 
   if (length(comparisons)>2) stop("Package currently compares two experiments. Check back for updates to compare multiple experiments.")
+
+  if (any((data$study %in% c(0,1))==FALSE)) stop("Package currently considers two studies, where study=1 is an RCT, and study=0 is a real-world dataset.")
 
   if (comparisons[[1]]!=1) stop("First comparison should be c(1) (ie compare to RCT only).")
 
