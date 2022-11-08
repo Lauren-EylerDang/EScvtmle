@@ -27,7 +27,7 @@ ES.cvtmle(
   family,
   family_nco,
   fluctuation = "logistic",
-  comparisons = list(c(1), c(1, 2)),
+  comparisons = list(c(1), c(1, 0)),
   adjustnco = FALSE,
   target.gwt = TRUE,
   bounds = NULL,
@@ -40,7 +40,7 @@ ES.cvtmle(
 
 \item{data}{The dataset}
 
-\item{study}{Character name of variable indicating study participation (e.g. "S"). This variable should take a value of 1 for the RCT and should take other values for the other study(ies). Note that the code is currently set up only to handle two studies, but may be expanded to handle multiple studies in the future.}
+\item{study}{Character name of variable indicating study participation (e.g. "S"). This variable should take a value of 1 for the RCT and should take a value of 0 for the RWD. Note that the code is currently set up only to handle two studies, but may be expanded to handle multiple studies in the future.}
 
 \item{covariates}{Vector of character names of covariates to be adjusted for (e.g. c("W1", "W2"))}
 
