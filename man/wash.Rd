@@ -45,6 +45,7 @@ We scaled this variable to match the scale of the true outcome (length-for-age Z
 \donttest{data(wash)
 #For unbiased external controls, use:
 dat <- wash[which(wash$study \%in\% c(1,2)),]
+dat$study[which(dat$study==2)]<-0
 set.seed(2022)
 results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           data=dat, study="study",
@@ -55,7 +56,7 @@ results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           pRCT=0.5, V=5, Q.SL.library=c("SL.glm"),
                           g.SL.library=c("SL.glm"), Q.discreteSL=TRUE, g.discreteSL=TRUE,
                           family="gaussian", family_nco="gaussian", fluctuation = "logistic",
-                          comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
+                          comparisons = list(c(1),c(1,0)), adjustnco = FALSE, target.gwt = TRUE)
 print.EScvtmle(results_rwd1)
 }
 
