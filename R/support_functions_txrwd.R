@@ -1,7 +1,7 @@
 #' @importFrom SuperLearner SuperLearner
 #' @importFrom stats predict
 #Function for training initial estimators for the outcome, treatment mechanism, and study selection mechanism regressions for RCT with or without real-world data (when active treatment is available in real-world data)
-selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, bounds, cvControl){
+selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation = "logistic", NCO=NULL, Delta=NULL, Delta_NCO = NULL, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, bounds=NULL, cvControl=list()){
 
   #Train regressions for different experiments
   if(any(train_s$S==0)){
@@ -34,14 +34,14 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
 
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
       }
 
     } else {
-      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, cvControl = cvControl)
+      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, cvControl = cvControl))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
@@ -63,7 +63,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+      DbarSL<- suppressWarnings(SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -79,7 +79,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
     }
 
     # Estimate the exposure mechanism g(A|W)
-    gHatSL<- SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+    gHatSL<- suppressWarnings(SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
     if(g.discreteSL==TRUE){
       keepAlg <- which.min(gHatSL$cvRisk)
       gHatSL <- gHatSL$fitLibrary[[keepAlg]]
@@ -138,7 +138,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
     }
 
     # Estimate the trial participation mechanism g(S|A,W)
-    gSHatSL<- SuperLearner(Y=X$S, X=X[ , -which(names(X) %in% c("S","A","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+    gSHatSL<- suppressWarnings(SuperLearner(Y=X$S, X=X[ , -which(names(X) %in% c("S","A","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
     if(g.discreteSL==TRUE){
       keepAlg <- which.min(gSHatSL$cvRisk)
       gSHatSL <- gSHatSL$fitLibrary[[keepAlg]]
@@ -215,13 +215,13 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
       }
 
       if(fluctuation == "logistic"){
-        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
         }
       } else {
-        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
@@ -239,7 +239,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
       }
 
       # Estimate the exposure mechanism g(A|W)
-      gHatSLnco<- SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","NCO_delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+      gHatSLnco<- suppressWarnings(SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","NCO_delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
       if(g.discreteSL==TRUE){
         keepAlg <- which.min(gHatSLnco$cvRisk)
         gHatSLnco <- gHatSLnco$fitLibrary[[keepAlg]]
@@ -253,7 +253,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+        DbarSLnco<- suppressWarnings(SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]
@@ -333,13 +333,13 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
 
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
       }
     } else {
-      QbarSL<- SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
@@ -362,7 +362,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+      DbarSL<- suppressWarnings(SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -439,13 +439,13 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
       }
 
       if(fluctuation == "logistic"){
-        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
         }
       } else {
-        NCObarSL<- SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
@@ -468,7 +468,7 @@ selector_func_txrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT, d
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl)
+        DbarSLnco<- suppressWarnings(SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]
