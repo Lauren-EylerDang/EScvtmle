@@ -15,6 +15,8 @@
 # Includes removal of observations from observational dataset with W covariates not represented in RCT if txinrwd==FALSE
 preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco = adjustnco){
 
+  data <- data.frame(data)
+
   #remove observations missing treatment
   data <- rename(data, A = all_of(treatment_var))
 

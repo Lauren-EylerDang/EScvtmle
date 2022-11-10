@@ -16,7 +16,7 @@ Delta_NCO=NULL
 pRCT=0.5
 V=10
 Q.SL.library=c("SL.glm")
-d.SL.library=c("SL.glm")
+d.SL.library.RCT <- d.SL.library.RWD <- c("SL.glm")
 g.SL.library=c("SL.glm")
 Q.discreteSL=TRUE
 d.discreteSL=TRUE
@@ -28,7 +28,8 @@ comparisons = list(c(1),c(1,2))
 adjustnco = FALSE
 target.gwt = TRUE
 bounds = NULL
-
+cvControl = list()
+MCsamp=1000
 
 
 #tests for .bound function for bounding denominator of clever covariates
@@ -102,7 +103,7 @@ test_that("Confirm correct processing of missing outcomes for outcome and nco", 
 test_that("Confirm correct processing of missing outcomes for outcome and nco", {
   dat1 <- data
   check <- preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged", "sex"), treatment_var="treatment", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
-  check2 <- apply_selector_func(txinrwd, train=check, data=check, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons, bounds)
+  check2 <- apply_selector_func(txinrwd, train=check, data=check, Q.SL.library, d.SL.library.RCT,d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons, bounds, cvControl)
   expect_equal(length(check$Y[which(check$S==1)]), length(check2[[1]]$Y))
 })
 
@@ -165,7 +166,7 @@ for(v in 1:length(folds)){
   #define training set
   train <- data[sort(folds[[v]]$training_set),]
 
-  selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons, bounds)
+  selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons, bounds, cvControl)
 
   if(txinrwd==TRUE){
     bvt[[v]] <- bvt_txinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
@@ -222,7 +223,7 @@ test_that("Solved EICs", {
 })
 
 #tests for limitdist_sample
-limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons)
+limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons, MCsamp)
 
 test_that("Confirm 0 covariance between training set bias EICs and estimation set ate EICs", {
   expect_equal(c(limitdistsamp$covMat_poundplusphi[1,21],limitdistsamp$covMat_poundplusphi[1,22],limitdistsamp$covMat_poundplusphi[2,21],limitdistsamp$covMat_poundplusphi[2,22]),c(0,0,0,0))
