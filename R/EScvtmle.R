@@ -75,7 +75,7 @@
 #' results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
 #'                           data=dat, study="study",
 #'                           covariates=c("aged", "sex", "momedu", "hfiacat"),
-#'                           treatment_var="treatment", treatment=1,
+#'                           treatment_var="intervention", treatment=1,
 #'                           outcome="laz", NCO="Nlt18scale",
 #'                           Delta=NULL, Delta_NCO=NULL,
 #'                           pRCT=0.5, V=5, Q.SL.library=c("SL.glm"),
