@@ -13,7 +13,7 @@
 #' @importFrom tidyselect all_of
 # Function to pre-process data
 # Includes removal of observations from observational dataset with W covariates not represented in RCT if txinrwd==FALSE
-preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco = adjustnco){
+preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, id=NULL, adjustnco = adjustnco){
 
   data <- data.frame(data)
 
@@ -28,6 +28,15 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
 
   data <- rename(data, S = all_of(study))
   data <- rename(data, Y = all_of(outcome))
+
+  if(is.null(id) == FALSE){
+    data <- rename(data, id = all_of(id))
+  } else {
+    data$id <- 1:nrow(data)
+  }
+
+  #order by id variable (simplifies sorting later)
+  data <- data[order(data$id),]
 
   if (length(which(data$S>1 & data$A==1))>0 & txinrwd==FALSE) stop("Active treatment available in external data. Set txinrwd==TRUE.")
 
@@ -57,11 +66,12 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
 
     if(is.null(Delta_NCO)==FALSE){
       data <- rename(data, NCO_delta = all_of(Delta_NCO))
+    } else {
+      data$NCO_delta <- rep(1, nrow(data))
     }
 
     if(any(is.na(data$nco)==TRUE)){
       if(is.null(Delta_NCO)==TRUE){
-        data$NCO_delta <- rep(1, nrow(data))
         data$NCO_delta[which(is.na(data$nco)==TRUE)] <- 0
         Delta_NCO <- "NCO_delta"
       }
@@ -72,11 +82,12 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
 
   if(is.null(Delta)==FALSE){
     data <- rename(data, Delta = all_of(Delta))
+  } else {
+    data$Delta <- rep(1, nrow(data))
   }
 
   if(any(is.na(data$Y)==TRUE)){
     if(is.null(Delta)==TRUE){
-      data$Delta <- rep(1, nrow(data))
       data$Delta[which(is.na(data$Y)==TRUE)] <- 0
       Delta <- "Delta"
     }
@@ -85,7 +96,7 @@ preprocess <- function(txinrwd, data, study, covariates, treatment_var, treatmen
 
 
 
-  data <- data[,which(colnames(data) %in% c("S", covariates, "A", "Y", "nco", "NCO_delta", "Delta"))]
+  data <- data[,which(colnames(data) %in% c("S", covariates, "A", "Y", "nco", "NCO_delta", "Delta", "id"))]
 
   return(data)
 }
@@ -168,16 +179,19 @@ validpreds <- function(data, folds, V, selector, pRCT, Delta, Q.discreteSL, d.di
 #' @importFrom stats plogis
 #' @importFrom stats qlogis
 #function to estimate components of limit distribution of ES-CVTMLE estimator
-limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons, bounds){
+limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons, bounds, n.id){
   out <- list()
 
-  out$EICay <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
+  datid <- data[which(duplicated(data$id)==FALSE),]
+
+  out$EICay <- matrix(0, nrow=n.id, ncol=length(comparisons)*V)
   out$psi <- list()
   for(v in 1:V){
     out$psi[[v]] <- vector()
   }
 
   out$clevercov <- list()
+  out$checkEICay <- list()
 
   for(s in 1:length(comparisons)){
 
@@ -186,10 +200,6 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
 
     if(family=="gaussian" & fluctuation == "logistic"){
       validmat$Yscale <- (validmat$Yscale - min(data$Y))/(max(data$Y) - min(data$Y))
-    }
-
-    if(("Delta" %in% colnames(data))==FALSE){
-      data$Delta <- rep(1, nrow(data))
     }
 
     if(target.gwt){
@@ -237,9 +247,15 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
 
     out$clevercov[[s]] <- rep(NA, nrow(data))
 
+    out$checkEICay[[s]] <- ((wt*H.AW)*(data$Y - validmat$QbarAW.star) + validmat$Qbar1W.star - validmat$Qbar0W.star - (mean((validmat$Qbar1W.star - validmat$Qbar0W.star)[which((data$S %in% comparisons[[s]]))])))[which((data$S %in% comparisons[[s]]))]
+
     for(v in 1:V){
       out$psi[[v]][s] <- mean((validmat$Qbar1W.star - validmat$Qbar0W.star)[which(validmat$v==v & (data$S %in% comparisons[[s]]))])
-      out$EICay[which(data$v==v & (data$S %in% comparisons[[s]])),(length(comparisons)*(v-1)+s)] <- ((wt*H.AW)*(data$Y - validmat$QbarAW.star) + validmat$Qbar1W.star - validmat$Qbar0W.star - out$psi[[v]][s])[which(data$v==v & (data$S %in% comparisons[[s]]))]/((length(which(data$v==v & (data$S %in% comparisons[[s]]))))/nrow(data))
+      EICay_s <- ((wt*H.AW)*(data$Y - validmat$QbarAW.star) + validmat$Qbar1W.star - validmat$Qbar0W.star - out$psi[[v]][s])[which(data$v==v & (data$S %in% comparisons[[s]]))]
+      EICay_s <- as.vector(by(EICay_s, data$id[which(data$v==v & (data$S %in% comparisons[[s]]))], mean))
+
+
+      out$EICay[which(datid$v==v & (datid$S %in% comparisons[[s]])),(length(comparisons)*(v-1)+s)] <- EICay_s/((length(which(datid$v==v & (datid$S %in% comparisons[[s]]))))/n.id)
       out$clevercov[[s]][which(data$v==v & (data$S %in% comparisons[[s]]) & data$Delta==1)] <- (wt*H.AW)[which(data$v==v & (data$S %in% comparisons[[s]]) & data$Delta==1)]
     }
 
@@ -248,7 +264,9 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
     if(s==1){
       pooledVar <- list()
       for(v in 1:V){
-        pooledVar[[v]] <- var(((wt*H.AW)*(data$Y - validmat$QbarAW.star) + validmat$Qbar1W.star - validmat$Qbar0W.star - out$psi[[v]][s])[which(data$v==v & (data$S %in% comparisons[[s]]))])/((length(which(data$S %in% comparisons[[s]]))))
+        pooledvar_eic <- ((wt*H.AW)*(data$Y - validmat$QbarAW.star) + validmat$Qbar1W.star - validmat$Qbar0W.star - out$psi[[v]][s])[which(data$v==v & (data$S %in% comparisons[[s]]))]
+        pooledvar_eic <- as.vector(by(pooledvar_eic, data$id[which(data$v==v & (data$S %in% comparisons[[s]]))], mean))
+        pooledVar[[v]] <- var(pooledvar_eic)/((length(which(data$S %in% comparisons[[s]] & duplicated(data$id)==FALSE))))
       }
       out$Var <- mean(unlist(pooledVar))
     }
@@ -261,7 +279,7 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
 
 #function for sampling from the estimated limit distribution
 
-limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons, MCsamp){
+limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, n.id, comparisons, MCsamp){
   out <- list()
   psipoundvec <- NA
   for(v in 1:V){
@@ -279,18 +297,18 @@ limitdist_sample <- function(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist
     #overall covariance matrix for ztilde_poundplusphi
     EICpoundplusphi <- EICpsipound+EICnco
     EICmat_poundplusphi <- cbind(EICpoundplusphi, limitdist$EICay)
-    out$covMat_poundplusphi <- (t(EICmat_poundplusphi)%*%EICmat_poundplusphi)/nrow(data)
+    out$covMat_poundplusphi <- (t(EICmat_poundplusphi)%*%EICmat_poundplusphi)/n.id
 
-    ztilde_poundplusphi_samp <- mvrnorm(n = MCsamp, mu=rep(0,ncol(EICmat_poundplusphi)), Sigma=out$covMat_poundplusphi/nrow(data))
+    ztilde_poundplusphi_samp <- mvrnorm(n = MCsamp, mu=rep(0,ncol(EICmat_poundplusphi)), Sigma=out$covMat_poundplusphi/n.id)
   }
 
   #overall covariance matrix for ztilde
   EICmat <- cbind(EICpsipound, limitdist$EICay)
 
-  out$covMat <- (t(EICmat)%*%EICmat)/nrow(data)
+  out$covMat <- (t(EICmat)%*%EICmat)/n.id
 
   #sample from multivariate ztilde
-  ztilde_samp <- mvrnorm(n = MCsamp, mu=rep(0,ncol(EICmat)), Sigma=out$covMat/nrow(data))
+  ztilde_samp <- mvrnorm(n = MCsamp, mu=rep(0,ncol(EICmat)), Sigma=out$covMat/n.id)
 
   #selector for each sample
   biassample_psipound <- ztilde_samp[,(1:as.numeric(length(comparisons)*V))]

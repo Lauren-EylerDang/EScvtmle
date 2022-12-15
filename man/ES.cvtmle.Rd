@@ -15,6 +15,7 @@ ES.cvtmle(
   NCO = NULL,
   Delta = NULL,
   Delta_NCO = NULL,
+  id = NULL,
   pRCT,
   V = 10,
   Q.SL.library,
@@ -55,6 +56,8 @@ ES.cvtmle(
 \item{Delta}{Character name of a variable that is 0 if an observation was censored (missing outcome) and 1 otherwise. Missing outcomes may also be coded as NA, in which case a Delta variable will be added internally. If no missing outcomes, set Delta=NULL.}
 
 \item{Delta_NCO}{Character name of a variable that is 0 if the value of NCO is missing and 1 otherwise. Missing NCOs may also be coded as NA, in which case a Delta_NCO variable will be added internally. If no missing NCO or no NCO, set Delta_NCO=NULL.}
+
+\item{id}{ID variable for the independent unit}
 
 \item{pRCT}{The probability of randomization to treatment in the RCT}
 
@@ -131,7 +134,7 @@ set.seed(2022)
 results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           data=dat, study="study",
                           covariates=c("aged", "sex", "momedu", "hfiacat"),
-                          treatment_var="treatment", treatment=1,
+                          treatment_var="intervention", treatment=1,
                           outcome="laz", NCO="Nlt18scale",
                           Delta=NULL, Delta_NCO=NULL,
                           pRCT=0.5, V=5, Q.SL.library=c("SL.glm"),

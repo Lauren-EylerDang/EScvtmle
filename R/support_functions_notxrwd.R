@@ -12,9 +12,9 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
     }
 
     if(adjustnco == FALSE){
-      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "NCO_delta", "v"))==FALSE)]
+      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "NCO_delta", "v", "id"))==FALSE)]
     } else {
-      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "NCO_delta", "v"))==FALSE)]
+      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "NCO_delta", "v", "id"))==FALSE)]
     }
 
 
@@ -23,25 +23,20 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
     X0$A <- 0
     X1$A <- 1
 
-    if(is.null(Delta)==FALSE){
-      Ynomiss <- Y[which(X$Delta==1)]
-      Xnomiss <- X[which(X$Delta==1),]
-      Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("Delta"))]
-    } else {
-      Ynomiss <- Y
-      Xnomiss <- X
-    }
+    Ynomiss <- Y[which(X$Delta==1)]
+    Xnomiss <- X[which(X$Delta==1),]
+    Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("Delta"))]
 
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(X$Delta==1)]))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
       }
 
     } else {
-      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, cvControl = cvControl))
+      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, cvControl = cvControl, id=train_s$id[which(X$Delta==1)]))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
@@ -63,7 +58,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- suppressWarnings(SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+      DbarSL<- suppressWarnings(SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -79,7 +74,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
     }
 
     # Estimate the exposure mechanism g(A|W)
-    gHatSL<- suppressWarnings(SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+    gHatSL<- suppressWarnings(SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id))
     if(g.discreteSL==TRUE){
       keepAlg <- which.min(gHatSL$cvRisk)
       gHatSL <- gHatSL$fitLibrary[[keepAlg]]
@@ -118,9 +113,9 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
 
     #TMLE for E[E[Y|W,A=0,S=1]]
     if(adjustnco == FALSE){
-      XS <- train_s[,which((colnames(train_s) %in% c("Y", "nco", "NCO_delta", "v"))==FALSE)]
+      XS <- train_s[,which((colnames(train_s) %in% c("Y", "nco", "NCO_delta", "v", "id"))==FALSE)]
     } else {
-      XS <- train_s[,which((colnames(train_s) %in% c("Y", "NCO_delta", "v"))==FALSE)]
+      XS <- train_s[,which((colnames(train_s) %in% c("Y", "NCO_delta", "v", "id"))==FALSE)]
     }
 
 
@@ -129,23 +124,19 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
     XS0$A <- 0 # under control
     XS0$S <- 1
 
-    if(is.null(Delta)==FALSE){
-      XSnomiss <- XS[which(XS$Delta==1),]
-      XSnomiss <- XSnomiss[ , -which(colnames(XSnomiss) %in% c("Delta"))]
-    } else {
-      XSnomiss <- XS
-      XS$Delta <- rep(1, nrow(XS))
-    }
+    XSnomiss <- XS[which(XS$Delta==1),]
+    XSnomiss <- XSnomiss[ , -which(colnames(XSnomiss) %in% c("Delta"))]
+
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL_S<- suppressWarnings(SuperLearner(Y=Ynomiss, X=XSnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+      QbarSL_S<- suppressWarnings(SuperLearner(Y=Ynomiss, X=XSnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(XS$Delta==1)]))
 
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL_S$cvRisk)
         QbarSL_S <- QbarSL_S$fitLibrary[[keepAlg]]
       }
     } else {
-      QbarSL_S<- suppressWarnings(SuperLearner(Y=Ynomiss, X=XSnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+      QbarSL_S<- suppressWarnings(SuperLearner(Y=Ynomiss, X=XSnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(XS$Delta==1)]))
 
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL_S$cvRisk)
@@ -167,7 +158,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
     # Estimate the trial participation mechanism g(S|A=0,Delta=1,W)
     #------------------------------------------
     lambda_A0 <- XS[which(XS$A==0 & XS$Delta==1),]
-    gSHatSL<- suppressWarnings(SuperLearner(Y=lambda_A0$S, X=lambda_A0[ , -which(colnames(lambda_A0) %in% c("A","S","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+    gSHatSL<- suppressWarnings(SuperLearner(Y=lambda_A0$S, X=lambda_A0[ , -which(colnames(lambda_A0) %in% c("A","S","Delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(XS$A==0 & XS$Delta==1)]))
     if(g.discreteSL==TRUE){
       keepAlg <- which.min(gSHatSL$cvRisk)
       gSHatSL <- gSHatSL$fitLibrary[[keepAlg]]
@@ -202,29 +193,24 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
         train_s_nco <- train_s$nco
       }
 
-      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "Delta", "v"))==FALSE)]
+      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "Delta", "v", "id"))==FALSE)]
       X0 <- X1 <- X
       X0$A <- 0
       X1$A <- 1
 
-      if(is.null(Delta_NCO)==FALSE){
-        NCOnomiss <- train_s_nco[which(X$NCO_delta==1)]
-        Xnomiss <- X[which(X$NCO_delta==1),]
-        Xnomiss <- Xnomiss[ , -which(names(Xnomiss) %in% c("NCO_delta"))]
-      } else {
-        NCOnomiss <- train_s_nco
-        Xnomiss <- X
-        X$NCO_delta <- rep(1, nrow(X))
-      }
+      NCOnomiss <- train_s_nco[which(X$NCO_delta==1)]
+      Xnomiss <- X[which(X$NCO_delta==1),]
+      Xnomiss <- Xnomiss[ , -which(names(Xnomiss) %in% c("NCO_delta"))]
+
 
       if(fluctuation == "logistic"){
-        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(X$NCO_delta==1)]))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
         }
       } else {
-        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(X$NCO_delta==1)]))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
@@ -242,7 +228,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
       }
 
       # Estimate the exposure mechanism g(A|W)
-      gHatSLnco<- suppressWarnings(SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","NCO_delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+      gHatSLnco<- suppressWarnings(SuperLearner(Y=X$A, X=X[ , -which(colnames(X) %in% c("A","NCO_delta"))], SL.library=g.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id))
       if(g.discreteSL==TRUE){
         keepAlg <- which.min(gHatSLnco$cvRisk)
         gHatSLnco <- gHatSLnco$fitLibrary[[keepAlg]]
@@ -256,7 +242,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- suppressWarnings(SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+        DbarSLnco<- suppressWarnings(SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RWD, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]
@@ -314,9 +300,9 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
 
     #run tmle for E[E[Y|W,A=0]]
     if(adjustnco == FALSE){
-      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "NCO_delta", "v"))==FALSE)]
+      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "NCO_delta", "v", "id"))==FALSE)]
     } else {
-      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "NCO_delta", "v"))==FALSE)]
+      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "NCO_delta", "v", "id"))==FALSE)]
     }
 
 
@@ -325,24 +311,19 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
     X0$A <- 0
     X1$A <- 1
 
-    if(is.null(Delta)==FALSE){
-      Ynomiss <- Y[which(X$Delta==1)]
-      Xnomiss <- X[which(X$Delta==1),]
-      Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("Delta"))]
-    } else {
-      Ynomiss <- Y
-      Xnomiss <- X
-    }
+    Ynomiss <- Y[which(X$Delta==1)]
+    Xnomiss <- X[which(X$Delta==1),]
+    Xnomiss <- Xnomiss[ , -which(colnames(Xnomiss) %in% c("Delta"))]
 
     # call Super Learner for estimation of QbarAW
     if(fluctuation == "logistic"){
-      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(X$Delta==1)]))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
       }
     } else {
-      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+      QbarSL<- suppressWarnings(SuperLearner(Y=Ynomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(X$Delta==1)]))
       if(Q.discreteSL==TRUE){
         keepAlg <- which.min(QbarSL$cvRisk)
         QbarSL <- QbarSL$fitLibrary[[keepAlg]]
@@ -365,7 +346,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
 
     dHat1W <- list()
     if(is.null(Delta)==FALSE){
-      DbarSL<- suppressWarnings(SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+      DbarSL<- suppressWarnings(SuperLearner(Y=X$Delta, X=X[ , -which(colnames(X) %in% c("Delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id))
       if(d.discreteSL==TRUE){
         keepAlg <- which.min(DbarSL$cvRisk)
         DbarSL <- DbarSL$fitLibrary[[keepAlg]]
@@ -423,28 +404,24 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
         train_s_nco <- train_s$nco
       }
 
-      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "Delta", "v"))==FALSE)]
+      X <- train_s[,which((colnames(train_s) %in% c("S","Y", "nco", "Delta", "v", "id"))==FALSE)]
       X0 <- X1 <- X
       X0$A <- 0
       X1$A <- 1
 
-      if(is.null(Delta_NCO)==FALSE){
-        NCOnomiss <- train_s_nco[which(X$NCO_delta==1)]
-        Xnomiss <- X[which(X$NCO_delta==1),]
-        Xnomiss <- Xnomiss[ , -which(names(Xnomiss) %in% c("NCO_delta"))]
-      } else {
-        NCOnomiss <- train_s_nco
-        Xnomiss <- X
-      }
+      NCOnomiss <- train_s_nco[which(X$NCO_delta==1)]
+      Xnomiss <- X[which(X$NCO_delta==1),]
+      Xnomiss <- Xnomiss[ , -which(names(Xnomiss) %in% c("NCO_delta"))]
+
 
       if(fluctuation == "logistic"){
-        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(X$NCO_delta==1)]))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
         }
       } else {
-        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+        NCObarSL<- suppressWarnings(SuperLearner(Y=NCOnomiss, X=Xnomiss, SL.library=Q.SL.library, family=family, control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id[which(X$NCO_delta==1)]))
         if(Q.discreteSL==TRUE){
           keepAlg <- which.min(NCObarSL$cvRisk)
           NCObarSL <- NCObarSL$fitLibrary[[keepAlg]]
@@ -466,7 +443,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
 
       dHat1Wnco <- list()
       if(is.null(Delta_NCO)==FALSE){
-        DbarSLnco<- suppressWarnings(SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl))
+        DbarSLnco<- suppressWarnings(SuperLearner(Y=X$NCO_delta, X=X[ , -which(colnames(X) %in% c("NCO_delta"))], SL.library=d.SL.library.RCT, family="binomial", control = list(saveFitLibrary=TRUE), cvControl = cvControl, id=train_s$id))
         if(d.discreteSL==TRUE){
           keepAlg <- which.min(DbarSLnco$cvRisk)
           DbarSLnco <- DbarSLnco$fitLibrary[[keepAlg]]
@@ -528,7 +505,7 @@ selector_func_notxrwd <- function(train_s, data, Q.SL.library, d.SL.library.RCT,
 #' @importFrom stats plogis
 #' @importFrom stats qlogis
 #Function to estimate the bias-variance tradeoff using the experiment-selection set for each fold when active treatment is not available in the real-world data
-bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation, family){
+bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuation, family, n.id){
   out <- list()
 
   out$b2v <- vector()
@@ -536,20 +513,19 @@ bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuatio
   out$var <- vector()
   out$EIClambdav <- list()
 
+  datid <- data[which(duplicated(data$id)==FALSE),]
+
   if(is.null(NCO)==FALSE){
     out$addncobias <- vector()
     out$bias_nco <- vector()
   }
 
-  out$EICpsipound <- matrix(0, nrow=nrow(data), ncol=length(comparisons))
-  out$EICnco <- matrix(0, nrow=nrow(data), ncol=length(comparisons))
+  out$EICpsipound <- matrix(0, nrow=n.id, ncol=length(comparisons))
+  out$EICnco <- matrix(0, nrow=n.id, ncol=length(comparisons))
 
 
   for(s in 1:length(comparisons)){
     train_s <- train[which(train$S %in% comparisons[[s]]),]
-    if(is.null(train_s$Delta)){
-      train_s$Delta <- rep(1, nrow(train_s))
-    }
 
     #tmle
     if(fluctuation == "logistic"){
@@ -580,7 +556,11 @@ bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuatio
       trainsY <- selector[[v]][[s]]$Y
     }
 
-    out$EIClambdav[[s]] <- (selector[[v]][[s]]$wt*(selector[[v]][[s]]$H.AW1 + selector[[v]][[s]]$H.AW0)*(trainsY - QbarAW.star) + Qbar1W.star - Qbar0W.star - mean(Qbar1W.star - Qbar0W.star))
+    #EIC
+    EIClambdav_s <- (selector[[v]][[s]]$wt*(selector[[v]][[s]]$H.AW1 + selector[[v]][[s]]$H.AW0)*(trainsY - QbarAW.star) + Qbar1W.star - Qbar0W.star - mean(Qbar1W.star - Qbar0W.star))
+    #account for dependent units
+    #take mean of EIC observations by trains_s$id (confirmed taking mean correctly)
+    out$EIClambdav[[s]] <- as.vector(by(EIClambdav_s, train_s$id, mean))
 
     if(s==1){
       QbarS0W.star <- Qbar0W.star
@@ -609,11 +589,13 @@ bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuatio
     }
 
     if(s>1){
-      out$EICpsipound[which(data$v!=v & data$S %in% comparisons[[s]]),s] <- (selector[[v]][[s]]$wt_s*(selector[[v]][[s]]$H.SAW)*(trainsY - QbarSAW.star) + QbarS0W.star - mean(QbarS0W.star) + selector[[v]][[s]]$wt*(selector[[v]][[s]]$H.AW0)*(trainsY - QbarAW.star) - Qbar0W.star + mean(Qbar0W.star))/(length(which(train$S %in% comparisons[[s]]))/nrow(data))
+      EICpsipound_s <- (selector[[v]][[s]]$wt_s*(selector[[v]][[s]]$H.SAW)*(trainsY - QbarSAW.star) + QbarS0W.star - mean(QbarS0W.star) + selector[[v]][[s]]$wt*(selector[[v]][[s]]$H.AW0)*(trainsY - QbarAW.star) - Qbar0W.star + mean(Qbar0W.star))
+      EICpsipound_s <- as.vector(by(EICpsipound_s, train_s$id, mean))
+      out$EICpsipound[which(datid$v!=v & datid$S %in% comparisons[[s]]),s] <- EICpsipound_s/(length(which(train$S %in% comparisons[[s]] & duplicated(train$id)==FALSE))/n.id)
     }
 
     out$bias[s] <- mean(QbarS0W.star) - mean(Qbar0W.star)
-    out$var[s] <- var(out$EIClambdav[[s]])/length(trainsY)
+    out$var[s] <- var(out$EIClambdav[[s]])/length(unique(train_s$id))
 
     #nco
     if(is.null(NCO)==FALSE){
@@ -650,7 +632,10 @@ bvt_notxinrwd <- function(v, selector, NCO, comparisons, train, data, fluctuatio
         train_s_nco <- selector[[v]][[s]]$train_s_nco
       }
 
-      out$EICnco[which(data$v!=v & data$S %in% comparisons[[s]]),s] <- (selector[[v]][[s]]$wt_nco*selector[[v]][[s]]$H.AWnco*(train_s_nco - NCObarAW.star) + NCObar1W.star - NCObar0W.star - mean(NCObar1W.star - NCObar0W.star))/(length(which(train$S %in% comparisons[[s]]))/nrow(data))
+      EICnco_s <- as.vector(selector[[v]][[s]]$wt_nco*selector[[v]][[s]]$H.AWnco*(train_s_nco - NCObarAW.star) + NCObar1W.star - NCObar0W.star - mean(NCObar1W.star - NCObar0W.star))
+      EICnco_s <- as.vector(by(EICnco_s, train_s$id, mean))
+
+      out$EICnco[which(datid$v!=v & datid$S %in% comparisons[[s]]),s] <- EICnco_s/(length(which(train$S %in% comparisons[[s]] & duplicated(train$id)==FALSE))/n.id)
 
       out$bias_nco[s] <- mean(NCObar1W.star - NCObar0W.star)
 

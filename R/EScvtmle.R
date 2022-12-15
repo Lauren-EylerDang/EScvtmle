@@ -12,6 +12,7 @@
 #' @param NCO Character name of negative control outcome variable (e.g. "nco") or NULL if no NCO available. If the NCO is a binary variable subject to censoring, censored observations should either be coded as NA or should be coded as 0 and a missingness indicator should be included (see parameter Delta_NCO below).
 #' @param Delta Character name of a variable that is 0 if an observation was censored (missing outcome) and 1 otherwise. Missing outcomes may also be coded as NA, in which case a Delta variable will be added internally. If no missing outcomes, set Delta=NULL.
 #' @param Delta_NCO Character name of a variable that is 0 if the value of NCO is missing and 1 otherwise. Missing NCOs may also be coded as NA, in which case a Delta_NCO variable will be added internally. If no missing NCO or no NCO, set Delta_NCO=NULL.
+#' @param id ID variable for the independent unit
 #' @param pRCT The probability of randomization to treatment in the RCT
 #' @param V Number of cross-validation folds (default 10)
 #' @param Q.SL.library Candidate algorithms for SuperLearner estimation of outcome regressions
@@ -87,7 +88,7 @@
 #'
 #' @export
 
-ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, pRCT, V=10, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,0)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL, cvControl = list(), MCsamp=1000){
+ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO=NULL, Delta=NULL, Delta_NCO=NULL, id=NULL, pRCT, V=10, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, Q.discreteSL, d.discreteSL, g.discreteSL, family, family_nco, fluctuation = "logistic", comparisons = list(c(1),c(1,0)), adjustnco = FALSE, target.gwt = TRUE, bounds=NULL, cvControl = list(), MCsamp=1000){
 
   if (length(comparisons)>2) stop("Package currently compares two experiments. Check back for updates to compare multiple experiments.")
 
@@ -95,37 +96,42 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
 
   if (comparisons[[1]]!=1) stop("First comparison should be c(1) (ie compare to RCT only).")
 
-  data <- preprocess(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, adjustnco)
-  if("Delta" %in% colnames(data)){
+  data <- preprocess(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, id, adjustnco)
+  if(any(data$Delta==0)){
     Delta = "Delta"
   }
 
-  if("NCO_delta" %in% colnames(data)){
+  if(any(data$NCO_delta==0)){
     Delta_NCO = "NCO_delta"
   }
 
   #Create cross-validation folds that preserve proportion of RCT (if txinwrd=TRUE) or of RCT controls (if txinrwd=FALSE) as well as proportion of outcomes in validation sets
-  ids <- data$S
 
-  if(txinrwd==TRUE){
-    if(family=="binomial"){
-      ids[which(data$S==1 & data$Y==1)] <- 0
-    } else {
-      ids[which(data$S==1)] <- 0
-    }
-  } else {
-    if(family=="binomial"){
-      ids[which(data$S==1 & data$A==0 & data$Y==1)] <- 0
-    } else {
-      ids[which(data$S==1 & data$A==0)] <- 0
-    }
-  }
+    ids <- data$S
 
-  folds <- make_folds(data, fold_fun = folds_vfold, V=V, strata_ids = ids)
+    if(txinrwd==TRUE){
+      if(family=="binomial"){
+        ids[which(data$S==1 & data$Y==1)] <- 0
+      } else {
+        ids[which(data$S==1)] <- 0
+      }
+    } else {
+      if(family=="binomial"){
+        ids[which(data$S==1 & data$A==0 & data$Y==1)] <- 0
+      } else {
+        ids[which(data$S==1 & data$A==0)] <- 0
+      }
+    }
+
+    folds <- make_folds(data, fold_fun = folds_vfold, V=V, cluster_ids = data$id, strata_ids = ids)
+
   data$v <- rep(NA, nrow(data))
   for(v in 1:V){
     data$v[folds[[v]]$validation_set]<-v
   }
+
+  #number of independent units
+  n.id <- length(unique(data$id))
 
   results <- list()
   selector <- list()
@@ -140,8 +146,8 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   proportionselected$ncobias <- list()
 
   var_ay <- vector()
-  EICpsipound <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
-  EICnco <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
+  EICpsipound <- matrix(0, nrow=n.id, ncol=length(comparisons)*V)
+  EICnco <- matrix(0, nrow=n.id, ncol=length(comparisons)*V)
 
   bias <- list()
   bias_nco <- list()
@@ -163,9 +169,9 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
     selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons, bounds, cvControl)
 
     if(txinrwd==TRUE){
-      bvt[[v]] <- bvt_txinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
+      bvt[[v]] <- bvt_txinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family, n.id)
     } else {
-      bvt[[v]] <- bvt_notxinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
+      bvt[[v]] <- bvt_notxinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family, n.id)
     }
 
     lambdatilde$b2v[[v]] <- comparisons[[which(bvt[[v]]$b2v==min(bvt[[v]]$b2v))]]
@@ -196,7 +202,7 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   results$foldATEs$ncobias <- vector()
 
   #estimate components of limit distribution
-  limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons, bounds)
+  limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons, bounds, n.id)
 
   results$g <- list()
   for(s in 1:length(comparisons)){
@@ -223,7 +229,7 @@ ES.cvtmle <- function(txinrwd, data, study, covariates, treatment_var, treatment
   }
 
   #sample from limit distribution
-  limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons, MCsamp)
+  limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, n.id, comparisons, MCsamp)
 
   results$CI$b2v <- list()
   results$CI$ncobias <- list()
