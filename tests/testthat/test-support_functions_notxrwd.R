@@ -10,7 +10,7 @@ generateData <- function(n1, n2, pRCT){
   #S
   S <- rep(NA, N)
   S[1:n1] <- 1
-  S[(n1+1):(n1+n2)] <- 2
+  S[(n1+1):(n1+n2)] <- 0
 
   #Some Ws
   W1 <- rnorm(N, 0, 1)
@@ -19,7 +19,7 @@ generateData <- function(n1, n2, pRCT){
   #A
   A <- rep(0, N)
   A[which(S==1)] <- rbinom(n1, 1, pRCT)
-  A[which(S==2)] <- 0
+  A[which(S==0)] <- 0
 
   #Outcome regression
   Uy <- rnorm(N, 0, 1)
@@ -46,6 +46,7 @@ outcome="Y"
 NCO="nco"
 Delta=NULL
 Delta_NCO=NULL
+id=NULL
 pRCT=0.5
 V=10
 Q.SL.library=c("SL.glm")
@@ -57,34 +58,47 @@ g.discreteSL=TRUE
 family="gaussian"
 family_nco="gaussian"
 fluctuation = "logistic"
-comparisons = list(c(1),c(1,2))
+comparisons = list(c(1),c(1,0))
 adjustnco = FALSE
 target.gwt = TRUE
 bounds=NULL
 cvControl=list()
 
-data <- preprocess(txinrwd=FALSE, data=data, study="S", covariates=c("W1", "W2"), treatment_var="A", treatment=1, outcome="Y", NCO="nco", Delta=NULL, Delta_NCO=NULL, adjustnco=FALSE)
-if("Delta" %in% colnames(data)){
+data <- preprocess(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, id, adjustnco)
+if(any(data$Delta==0)){
   Delta = "Delta"
 }
 
-if("NCO_delta" %in% colnames(data)){
+if(any(data$NCO_delta==0)){
   Delta_NCO = "NCO_delta"
 }
 
-#Create cross-validation folds that preserve proportion of RCT (if txinwrd=TRUE) or of RCT controls (if txinrwd=FALSE) in validation sets
-ids <- data$S
-ids[which(data$S==1 & data$A==0)] <- 0
+#Create cross-validation folds that preserve proportion of RCT (if txinwrd=TRUE) or of RCT controls (if txinrwd=FALSE) as well as proportion of outcomes in validation sets
 
-folds <- make_folds(data, fold_fun = folds_vfold, V=V, strata_ids = ids)
+ids <- data$S
+
+if(txinrwd==TRUE){
+  if(family=="binomial"){
+    ids[which(data$S==1 & data$Y==1)] <- 0
+  } else {
+    ids[which(data$S==1)] <- 0
+  }
+} else {
+  if(family=="binomial"){
+    ids[which(data$S==1 & data$A==0 & data$Y==1)] <- 0
+  } else {
+    ids[which(data$S==1 & data$A==0)] <- 0
+  }
+}
+
+folds <- make_folds(data, fold_fun = folds_vfold, V=V, cluster_ids = data$id, strata_ids = ids)
+
 data$v <- rep(NA, nrow(data))
 for(v in 1:V){
   data$v[folds[[v]]$validation_set]<-v
 }
+n.id <- length(unique(data$id))
 
-v<-1
-
-data[which(data$S==2),]$S <- 0
 train <- data[sort(folds[[v]]$training_set),]
 
 check <- selector_func_notxrwd(train_s=train, data, Q.SL.library=c("SL.glm"), d.SL.library.RCT=NULL, d.SL.library.RWD=NULL, g.SL.library=c("SL.glm"),
@@ -158,14 +172,13 @@ test_that("Predictions for missingness mechanism working as expected", {
 
 
 #tests for bvt_notxinrwd
-data[which(data$S==0),]$S <- 2
-train <- data[sort(folds[[v]]$training_set),]
+train <- data[sort(folds[[1]]$training_set),]
 
 out <- list()
 out[[1]] <- apply_selector_func(txinrwd=FALSE, train=train, data, Q.SL.library=c("SL.glm"), d.SL.library.RCT=c("SL.glm"), d.SL.library.RWD=c("SL.glm"), g.SL.library=c("SL.glm"),
                                 pRCT=0.5, family="gaussian", family_nco="gaussian", fluctuation="logistic", NCO="nco", Delta=NULL, Delta_NCO=NULL,
-                                adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, comparisons=list(c(1),c(1,2)), bounds, cvControl)
-check <- bvt_notxinrwd(v=1, selector=out, NCO="nco", comparisons=list(c(1),c(1,2)), train=train, data=data, fluctuation="logistic", family="gaussian")
+                                adjustnco=FALSE, target.gwt=TRUE, Q.discreteSL=TRUE, d.discreteSL=TRUE, g.discreteSL=TRUE, comparisons=list(c(1),c(1,0)), bounds, cvControl)
+check <- bvt_notxinrwd(v=1, selector=out, NCO="nco", comparisons=list(c(1),c(1,0)), train=train, data=data, fluctuation="logistic", family="gaussian", n.id)
 
 test_that("Solves EICs", {
   expect_equal(mean(check$EIClambdav[[1]]),0)

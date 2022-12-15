@@ -1,18 +1,20 @@
 #import data for testing
 data(wash)
 dat <- wash[which(wash$study %in% c(1,2)),]
+dat$study[which(dat$study==2)]<-0
 
 library(SuperLearner)
 txinrwd=TRUE
 data=dat
 study="study"
 covariates=c("aged", "sex", "momedu")
-treatment_var="treatment"
+treatment_var="intervention"
 treatment=1
 outcome="laz"
 NCO="Nlt18scale"
 Delta=NULL
 Delta_NCO=NULL
+id=NULL
 pRCT=0.5
 V=10
 Q.SL.library=c("SL.glm")
@@ -24,7 +26,7 @@ g.discreteSL=TRUE
 family="gaussian"
 family_nco="gaussian"
 fluctuation = "logistic"
-comparisons = list(c(1),c(1,2))
+comparisons = list(c(1),c(1,0))
 adjustnco = FALSE
 target.gwt = TRUE
 bounds = NULL
@@ -51,50 +53,50 @@ test_that(".bound respects user-specified bounds", {
 #tests for preprocess function
 test_that("Message if removing observations missing treatment variable", {
   dat1 <- data
-  dat1$treatment[1] <- NA
-  expect_message(preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged", "sex", "momedu", "hfiacat"), treatment_var="treatment", treatment=1, outcome="laz"), "Removing observations with missing treatment variable.")
+  dat1$intervention[1] <- NA
+  expect_message(preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged", "sex", "momedu", "hfiacat"), treatment_var="intervention", treatment=1, outcome="laz"), "Removing observations with missing treatment variable.")
 })
 
 test_that("Confirm columns renamed appropriately", {
-  check <- preprocess(txinrwd=TRUE, data=data, study="study", covariates=c("aged"), treatment_var="treatment", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
+  check <- preprocess(txinrwd=TRUE, data=data, study="study", covariates=c("aged"), treatment_var="intervention", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
   expect_true(all(c("S", "A", "Y", "nco") %in% colnames(check)))
 })
 
 test_that("Confirm treatment variable renamed appropriately", {
   dat1 <- data
-  dat1[which(dat1$treatment==1),]$treatment <- "Treat"
-  dat1[which(dat1$treatment==0),]$treatment <- "Ctrl"
-  check <- preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged"), treatment_var="treatment", treatment="Treat", outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
+  dat1[which(dat1$intervention==1),]$intervention <- "Treat"
+  dat1[which(dat1$intervention==0),]$intervention <- "Ctrl"
+  check <- preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged"), treatment_var="intervention", treatment="Treat", outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
   expect_true(all(check$A %in% c(0,1)))
-  expect_equal(length(which(dat1$treatment=="Treat")), length(which(check$A==1)))
+  expect_equal(length(which(dat1$intervention=="Treat")), length(which(check$A==1)))
 })
 
 test_that("Confirm no covariates in RWD not represented in RCT if txinrwd=FALSE (avoid positivity violation)", {
   dat1 <- data
-  dat1 <- dat1[-which(dat1$study==2 & dat1$treatment==1),]
+  dat1 <- dat1[-which(dat1$study==0 & dat1$intervention==1),]
   dat1$momedu <- as.factor(dat1$momedu)
   dat1$momedu[which(dat1$momedu=="No education" & dat1$study==1)] <- "Primary (1-5y)"
-  check <- preprocess(txinrwd=FALSE, data=dat1, study="study", covariates=c("aged"), treatment_var="treatment", treatment=1, outcome="laz")
-  expect_true(min(check$aged[which(check$S>1)]) >= min(check$aged[which(check$S==1)]))
-  expect_true(max(check$aged[which(check$S>1)]) <= max(check$aged[which(check$S==1)]))
+  check <- preprocess(txinrwd=FALSE, data=dat1, study="study", covariates=c("aged"), treatment_var="intervention", treatment=1, outcome="laz")
+  expect_true(min(check$aged[which(check$S<1)]) >= min(check$aged[which(check$S==1)]))
+  expect_true(max(check$aged[which(check$S<1)]) <= max(check$aged[which(check$S==1)]))
   expect_true(length(which(check$momedu=="No education"))==0)
 })
 
 test_that("Confirm does not trim observations with NCO values outside of RCT if adjustnco==FALSE", {
   dat1 <- data
-  dat1 <- dat1[-which(dat1$study==2 & dat1$treatment==1),]
-  dat1[which(dat1$study==2),]$Nlt18scale[1] <- -2
-  dat1[which(dat1$study==2),]$Nlt18scale[2] <- 10
-  check <- preprocess(txinrwd=FALSE, data=dat1, study="study", covariates=c("aged"), treatment_var="treatment", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
-  expect_equal(min(check$nco[which(check$S>1)]), -2)
-  expect_equal(max(check$nco[which(check$S>1)]), 10)
+  dat1 <- dat1[-which(dat1$study==0 & dat1$intervention==1),]
+  dat1[which(dat1$study==0),]$Nlt18scale[1] <- -2
+  dat1[which(dat1$study==0),]$Nlt18scale[2] <- 10
+  check <- preprocess(txinrwd=FALSE, data=dat1, study="study", covariates=c("aged"), treatment_var="intervention", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
+  expect_equal(min(check$nco[which(check$S<1)]), -2)
+  expect_equal(max(check$nco[which(check$S<1)]), 10)
 })
 
 test_that("Confirm correct processing of missing outcomes for outcome and nco", {
   dat1 <- data
   dat1$laz[1:3] <- NA
   dat1$Nlt18scale[4:6] <- NA
-  check <- preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged", "sex"), treatment_var="treatment", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
+  check <- preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged", "sex"), treatment_var="intervention", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
   expect_equal(check$NCO_delta[4:6], c(0,0,0))
   expect_equal(check$Delta[1:3], c(0,0,0))
 })
@@ -102,7 +104,7 @@ test_that("Confirm correct processing of missing outcomes for outcome and nco", 
 #tests for apply_selectorfunc function
 test_that("Confirm correct processing of missing outcomes for outcome and nco", {
   dat1 <- data
-  check <- preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged", "sex"), treatment_var="treatment", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
+  check <- preprocess(txinrwd=TRUE, data=dat1, study="study", covariates=c("aged", "sex"), treatment_var="intervention", treatment=1, outcome="laz", NCO="Nlt18scale", adjustnco = FALSE)
   check2 <- apply_selector_func(txinrwd, train=check, data=check, Q.SL.library, d.SL.library.RCT,d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO=NULL, Delta=NULL, Delta_NCO=NULL, adjustnco=adjustnco, target.gwt=target.gwt, Q.discreteSL=Q.discreteSL, d.discreteSL=d.discreteSL, g.discreteSL=g.discreteSL, comparisons, bounds, cvControl)
   expect_equal(length(check$Y[which(check$S==1)]), length(check2[[1]]$Y))
 })
@@ -110,28 +112,42 @@ test_that("Confirm correct processing of missing outcomes for outcome and nco", 
 
 #tests for validpreds function
 data$laz[sample(nrow(data),100)] <- NA
-data <- preprocess(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, adjustnco)
-if("Delta" %in% colnames(data)){
+data <- preprocess(txinrwd, data, study, covariates, treatment_var, treatment, outcome, NCO, Delta, Delta_NCO, id, adjustnco)
+if(any(data$Delta==0)){
   Delta = "Delta"
 }
 
-if("NCO_delta" %in% colnames(data)){
+if(any(data$NCO_delta==0)){
   Delta_NCO = "NCO_delta"
 }
-#Create cross-validation folds that preserve proportion of RCT (if txinwrd=TRUE) or of RCT controls (if txinrwd=FALSE) in validation sets
+
+#Create cross-validation folds that preserve proportion of RCT (if txinwrd=TRUE) or of RCT controls (if txinrwd=FALSE) as well as proportion of outcomes in validation sets
+
 ids <- data$S
 
 if(txinrwd==TRUE){
-  ids[which(data$S==1)] <- 0
+  if(family=="binomial"){
+    ids[which(data$S==1 & data$Y==1)] <- 0
+  } else {
+    ids[which(data$S==1)] <- 0
+  }
 } else {
-  ids[which(data$S==1 & data$A==0)] <- 0
+  if(family=="binomial"){
+    ids[which(data$S==1 & data$A==0 & data$Y==1)] <- 0
+  } else {
+    ids[which(data$S==1 & data$A==0)] <- 0
+  }
 }
 
-folds <- make_folds(data, fold_fun = folds_vfold, V=V, strata_ids = ids)
+folds <- make_folds(data, fold_fun = folds_vfold, V=V, cluster_ids = data$id, strata_ids = ids)
+
 data$v <- rep(NA, nrow(data))
 for(v in 1:V){
   data$v[folds[[v]]$validation_set]<-v
 }
+
+#number of independent units
+n.id <- length(unique(data$id))
 
 results <- list()
 selector <- list()
@@ -146,8 +162,8 @@ proportionselected$b2v <- list()
 proportionselected$ncobias <- list()
 
 var_ay <- vector()
-EICpsipound <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
-EICnco <- matrix(0, nrow=nrow(data), ncol=length(comparisons)*V)
+EICpsipound <- matrix(0, nrow=n.id, ncol=length(comparisons)*V)
+EICnco <- matrix(0, nrow=n.id, ncol=length(comparisons)*V)
 
 bias <- list()
 bias_nco <- list()
@@ -169,9 +185,9 @@ for(v in 1:length(folds)){
   selector[[v]] <- apply_selector_func(txinrwd, train, data, Q.SL.library, d.SL.library.RCT, d.SL.library.RWD, g.SL.library, pRCT, family, family_nco, fluctuation, NCO, Delta, Delta_NCO, adjustnco, target.gwt, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons, bounds, cvControl)
 
   if(txinrwd==TRUE){
-    bvt[[v]] <- bvt_txinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
+    bvt[[v]] <- bvt_txinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family, n.id)
   } else {
-    bvt[[v]] <- bvt_notxinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family)
+    bvt[[v]] <- bvt_notxinrwd(v, selector, NCO, comparisons, train, data, fluctuation, family, n.id)
   }
 
   lambdatilde$b2v[[v]] <- comparisons[[which(bvt[[v]]$b2v==min(bvt[[v]]$b2v))]]
@@ -190,6 +206,7 @@ for(v in 1:length(folds)){
 
 
 }
+
 check <- validpreds(data, folds, V, selector, pRCT, Delta, Q.discreteSL, d.discreteSL, g.discreteSL, comparisons)
 
 test_that("Confirm validpreds uses rct randomization probability for s=1", {
@@ -216,14 +233,14 @@ results$foldATEs <- list()
 results$foldATEs$b2v <- vector()
 results$foldATEs$ncobias <- vector()
 
-limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons, bounds)
+limitdist <- limitdistvar(V, valid_initial, data, folds, family, fluctuation, Delta, pRCT, target.gwt, comparisons, bounds, n.id)
 
 test_that("Solved EICs", {
-  expect_equal(mean(limitdist$EICay), 0)
+  expect_equal(mean(unlist(limitdist$checkEICay)), 0)
 })
 
 #tests for limitdist_sample
-limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, data, comparisons, MCsamp)
+limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, n.id, comparisons, MCsamp)
 
 test_that("Confirm 0 covariance between training set bias EICs and estimation set ate EICs", {
   expect_equal(c(limitdistsamp$covMat_poundplusphi[1,21],limitdistsamp$covMat_poundplusphi[1,22],limitdistsamp$covMat_poundplusphi[2,21],limitdistsamp$covMat_poundplusphi[2,22]),c(0,0,0,0))

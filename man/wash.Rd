@@ -7,7 +7,7 @@
 \format{
 An object of class "data.frame"
 \describe{
- \item{treatment}{For studies 1 and 2: 1 if participant was in the "Sanitation" arm and 0 if participant was in the "Control" arm. For study 3: 1 if participant's household had an improved latrine at baseline and 0 otherwise.}
+ \item{intervention}{For studies 1 and 2: 1 if participant was in the "Sanitation" arm and 0 if participant was in the "Control" arm. For study 3: 1 if participant's household had an improved latrine at baseline and 0 otherwise.}
  \item{study}{Study variable indicating RCT sample or external dataset as described above.}
  \item{laz}{Child length-for-age Z-score at 2 years post-baseline.}
  \item{aged}{Child's age in days.}
@@ -50,7 +50,7 @@ set.seed(2022)
 results_rwd1 <- ES.cvtmle(txinrwd=TRUE,
                           data=dat, study="study",
                           covariates=c("aged", "sex", "momedu", "hfiacat"),
-                          treatment_var="treatment", treatment=1,
+                          treatment_var="intervention", treatment=1,
                           outcome="laz", NCO="Nlt18scale",
                           Delta=NULL, Delta_NCO=NULL,
                           pRCT=0.5, V=5, Q.SL.library=c("SL.glm"),

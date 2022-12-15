@@ -10,7 +10,7 @@ generateData <- function(n1, n2, pRCT){
   #S
   S <- rep(NA, N)
   S[1:n1] <- 1
-  S[(n1+1):(n1+n2)] <- 2
+  S[(n1+1):(n1+n2)] <- 0
 
   #Some Ws
   W1 <- rnorm(N, 0, 1)
@@ -19,7 +19,7 @@ generateData <- function(n1, n2, pRCT){
   #A
   A <- rep(0, N)
   A[which(S==1)] <- rbinom(n1, 1, pRCT)
-  A[which(S==2)] <- rbinom(n2, 1, pRCT)
+  A[which(S==0)] <- rbinom(n2, 1, pRCT)
 
   #Outcome regression
 
@@ -43,7 +43,7 @@ results <- ES.cvtmle(txinrwd=TRUE,data=data, study="S",
                      pRCT=0.5, V=10, Q.SL.library=c("SL.glm"),
                      g.SL.library=c("SL.glm"), Q.discreteSL=TRUE, g.discreteSL=TRUE,
                      family="binomial", family_nco="binomial", fluctuation = "logistic",
-                     comparisons = list(c(1),c(1,2)), adjustnco = FALSE, target.gwt = TRUE)
+                     comparisons = list(c(1),c(1,0)), adjustnco = FALSE, target.gwt = TRUE)
 
 test_that("Correct number of folds", {
   expect_equal(length(results$foldATEs$b2v), 10)
