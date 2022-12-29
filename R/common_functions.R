@@ -254,7 +254,6 @@ limitdistvar<- function(V, valid_initial, data, folds, family, fluctuation, Delt
       EICay_s <- ((wt*H.AW)*(data$Y - validmat$QbarAW.star) + validmat$Qbar1W.star - validmat$Qbar0W.star - out$psi[[v]][s])[which(data$v==v & (data$S %in% comparisons[[s]]))]
       EICay_s <- as.vector(by(EICay_s, data$id[which(data$v==v & (data$S %in% comparisons[[s]]))], mean))
 
-
       out$EICay[which(datid$v==v & (datid$S %in% comparisons[[s]])),(length(comparisons)*(v-1)+s)] <- EICay_s/((length(which(datid$v==v & (datid$S %in% comparisons[[s]]))))/n.id)
       out$clevercov[[s]][which(data$v==v & (data$S %in% comparisons[[s]]) & data$Delta==1)] <- (wt*H.AW)[which(data$v==v & (data$S %in% comparisons[[s]]) & data$Delta==1)]
     }

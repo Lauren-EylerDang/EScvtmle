@@ -240,7 +240,7 @@ test_that("Solved EICs", {
 })
 
 #tests for limitdist_sample
-limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, n.id, comparisons, MCsamp)
+limitdistsamp <- limitdist_sample(V, bvt, NCO, EICpsipound, EICnco, var_ay, limitdist, n.id, comparisons, MCsamp=10000)
 
 test_that("Confirm 0 covariance between training set bias EICs and estimation set ate EICs", {
   expect_equal(c(limitdistsamp$covMat_poundplusphi[1,21],limitdistsamp$covMat_poundplusphi[1,22],limitdistsamp$covMat_poundplusphi[2,21],limitdistsamp$covMat_poundplusphi[2,22]),c(0,0,0,0))
