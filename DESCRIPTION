@@ -1,7 +1,7 @@
 Package: EScvtmle
 Type: Package
 Title: Experiment-Selector CV-TMLE for Integration of Observational and RCT Data
-Version: 0.0.1
+Version: 0.0.2
 Authors@R: c(
     person("Lauren Eyler", "Dang", email = "lauren.eyler@berkeley.edu", role = c("cre","aut")),
     person("Maya", "Petersen", email = "mayaliv@berkeley.edu", role = "aut"),
